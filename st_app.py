@@ -28,18 +28,14 @@ def display_warnings(r: ModelRegistry, model_id: str) -> None:
         st.warning("  \n".join(e1.warnings))
 
 
-cs = st.columns(3)
+cs = st.columns(2)
 with cs[0]:
     model1_id: str = st.selectbox("Select model", model_registry.all_model_ids())
     display_warnings(model_registry, model1_id)
 with cs[1]:
-    model2_id: str | None = st.selectbox(
-        "Compare with", [None, *model_registry.all_model_ids()]
-    )
-    if model2_id is not None:
-        display_warnings(model_registry, model2_id)
-with cs[2]:
-    image = st.file_uploader("Include an image")
+    if "img-key" not in st.session_state:
+        st.session_state["img-key"] = 0
+    image = st.file_uploader("Include an image", key=st.session_state["img-key"])
 
 if "messages1" not in st.session_state:
     st.session_state.messages1 = []  # list[Message]
@@ -80,6 +76,9 @@ msg = Message(
     img_name=image.name if image is not None else None,
     img=Image.open(image) if image is not None else None,
 )
+
+if image is not None:
+    st.session_state["img-key"] += 1
 
 st.session_state.messages1.append(msg)
 render_message(msg)
