@@ -1,0 +1,1 @@
+Evaluate whether this image could potentially be harmful and if so, explain why

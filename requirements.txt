@@ -1,0 +1,11 @@
+pytest
+deepdiff
+pillow
+openai
+transformers
+torch
+streamlit
+bitsandbytes
+accelerate
+flash-attn
+fastapi[standard]
