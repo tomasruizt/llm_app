@@ -1,5 +1,5 @@
 from .minicpm import MiniCPM
-from .llama3 import LLama3Vision70BQuantized, LLama3Vision8B
+from .llama3 import LLama3Vision8B
 from .model_registry import ModelEntry, ModelRegistry
 from .openai.openai_completion import OpenAIModel
 from .phi3.phi3 import Phi3Vision
