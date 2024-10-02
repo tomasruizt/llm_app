@@ -1,0 +1,30 @@
+x-common-gpu: &common-gpu
+  build:
+    dockerfile: Dockerfile-llm-app
+  environment:
+    - OPENAI_API_KEY=${OPENAI_API_KEY}
+    - HF_HOME=/app/.cache/huggingface
+    - LLMS_REST_API_KEY=${LLMS_REST_API_KEY}
+    - BUGSNAG_API_KEY=${BUGSNAG_API_KEY}
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+  volumes:
+      - /home/tomasruiz/.cache/huggingface:/app/.cache/huggingface
+
+services:
+
+  llmapp:
+    <<: *common-gpu
+    ports:
+      - "8020:8020"
+  rest_api:
+    <<: *common-gpu
+    ports:
+      - "8030:8030"
+    command: fastapi run rest_api.py --port 8030
+    hostname: rest_api
