@@ -15,7 +15,7 @@ docker compose up rest_api
 ```
 
 ## Structure
-* Each multimodal LLM has a different way of consuming image(s). This codebase unifies the different interfaces e.g. of Phi-3, MinCPM, OpenAI GPT-4o, etc. This is done with a single base class `LLM` (interface) which is then implemented by each concrete model. 
+* Each multimodal LLM has a different way of consuming image(s). This codebase unifies the different interfaces e.g. of Phi-3, MinCPM, OpenAI GPT-4o, etc. This is done with a single base class `LLM` (interface) which is then implemented by each concrete model. You can find these implementation in the directory `llmlib/llmlib/`.
+* The open-source implementation are based on the `transformers` library. I have experimented with `vLLM`, but it made the GPU run OOM. More fiddling is needed.
 * I have extracted a REST API using `FastAPI` to decouple the frontend streamlit code from the inference server.
 * The app supports small open-source models atm, because the inference server is running a single 24GB VRAM GPU. We will hopefully scale this backend up soon.
-

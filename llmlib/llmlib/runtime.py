@@ -11,7 +11,6 @@ def filled_model_registry() -> ModelRegistry:
             ModelEntry.from_cls_with_id(Phi3Vision),
             ModelEntry.from_cls_with_id(MiniCPM),
             ModelEntry.from_cls_with_id(LLama3Vision8B),
-            ModelEntry.from_cls_with_id(LLama3Vision70BQuantized),
             *[
                 ModelEntry(
                     model_id=id_, clazz=OpenAIModel, ctor=lambda: OpenAIModel(model=id_)
