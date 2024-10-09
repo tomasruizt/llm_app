@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from logging import getLogger
 import torch
 from transformers import (
     AutoModelForSpeechSeq2Seq,
@@ -6,6 +7,8 @@ from transformers import (
     pipeline,
     AutomaticSpeechRecognitionPipeline,
 )
+
+logger = getLogger(__name__)
 
 
 def create_whisper_pipe() -> AutomaticSpeechRecognitionPipeline:
@@ -48,4 +51,5 @@ class Whisper:
 
     def transcribe_file(self, file: str) -> str:
         assert isinstance(file, str)
+        logger.info("Transcribing file: %s", file)
         return self.pipe(file)["text"].strip()
