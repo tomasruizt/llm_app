@@ -12,6 +12,7 @@ bugsnag = "^4.7.1"
 decord = "^0.6.0"
 transformers = "^4.44.2"
 accelerate = "^0.34.2"
+flash-attn = "^2.6.3"
 
 [build-system]
 requires = ["poetry-core"]
