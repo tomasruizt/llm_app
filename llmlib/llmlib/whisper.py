@@ -47,4 +47,5 @@ class Whisper:
     )
 
     def transcribe_file(self, file: str) -> str:
+        assert isinstance(file, str)
         return self.pipe(file)["text"].strip()
