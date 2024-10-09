@@ -13,6 +13,7 @@ decord = "^0.6.0"
 transformers = "^4.44.2"
 accelerate = "^0.34.2"
 flash-attn = "^2.6.3"
+torch = "^2.4.0"
 
 [build-system]
 requires = ["poetry-core"]
