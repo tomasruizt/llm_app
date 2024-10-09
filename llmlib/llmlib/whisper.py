@@ -52,4 +52,15 @@ class Whisper:
     def transcribe_file(self, file: str) -> str:
         assert isinstance(file, str)
         logger.info("Transcribing file: %s", file)
-        return self.pipe(file)["text"].strip()
+        try:
+            return self._transcribe(file, return_timestamps=False)
+        except ValueError as e:
+            if "Please either pass `return_timestamps=True`" in repr(e):
+                logger.info("File is >30s, transcribing with timestamps: %s", file)
+                return self._transcribe(file, return_timestamps=True)
+            raise
+
+    def _transcribe(self, file: str, return_timestamps: bool) -> str:
+        # data["chunks"] contains the timestamped transcriptions
+        data = self.pipe(file, return_timestamps=return_timestamps)
+        return data["text"].strip()
