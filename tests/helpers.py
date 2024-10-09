@@ -56,7 +56,7 @@ def assert_model_recognizes_pyramid_in_image(model: LLM):
 
 
 def assert_model_recognizes_afd_in_video(model: LLM):
-    video_path = test_file_path("video.mp4")
+    video_path = file_for_test("video.mp4")
     question = "Describe the video in english"
     answer: str = model.video_prompt(video_path, question)
     assert "alternative für deutschland" in answer.lower(), answer
@@ -110,11 +110,11 @@ def mona_lisa_filename_and_img() -> tuple[str, PIL.Image.Image]:
 
 
 def get_test_img(name: str) -> PIL.Image.Image:
-    path = test_file_path(name)
+    path = file_for_test(name)
     return PIL.Image.open(path)
 
 
-def test_file_path(name: str) -> Path:
+def file_for_test(name: str) -> Path:
     return Path(__file__).parent.parent / "test-files" / name
 
 
