@@ -12,8 +12,6 @@ def create_whisper_pipe() -> AutomaticSpeechRecognitionPipeline:
     device = "cuda"
     torch_dtype = torch.float16
 
-    model_id = "openai/whisper-large-v3-turbo"
-
     model = AutoModelForSpeechSeq2Seq.from_pretrained(
         model_id,
         torch_dtype=torch_dtype,
@@ -37,8 +35,13 @@ def create_whisper_pipe() -> AutomaticSpeechRecognitionPipeline:
     return pipe
 
 
+model_id = "openai/whisper-large-v3-turbo"
+
+
 @dataclass
 class Whisper:
+    model_id = model_id
+
     pipe: AutomaticSpeechRecognitionPipeline = field(
         default_factory=create_whisper_pipe
     )
