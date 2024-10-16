@@ -52,6 +52,11 @@ def fetch_video_description(req: Request) -> str:
         request_options={"timeout": 600},
         generation_config={"temperature": 0.0},
     )
+    if len(response.candidates) == 0:
+        raise ValueError(
+            "No candidates in response. prompt_feedback='%s'" % response.prompt_feedback
+        )
+
     enum = type(response.candidates[0].finish_reason)
     if response.candidates[0].finish_reason == enum.SAFETY:
         raise UnsafeResponseError(safety_ratings=response.candidates[0].safety_ratings)
