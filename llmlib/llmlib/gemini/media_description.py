@@ -51,7 +51,7 @@ def fetch_media_description(req: Request) -> str:
         safety_settings=_block_nothing(),
     )
     if len(response.candidates) == 0:
-        raise ValueError(
+        raise ResponseRefusedException(
             "No candidates in response. prompt_feedback='%s'" % response.prompt_feedback
         )
 
@@ -95,3 +95,7 @@ class UnsafeResponseError(Exception):
             % safety_ratings
         )
         self.safety_categories = safety_ratings
+
+
+class ResponseRefusedException(Exception):
+    pass
