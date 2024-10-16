@@ -27,6 +27,13 @@ def test_video_transcription(model: Whisper):
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
+def test_translation(model: Whisper):
+    german_video = str(file_for_test("video.mp4"))
+    translation: str = model.transcribe_file(german_video, translate=True)
+    assert "The parties and their politicians" in translation
+
+
+@pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
 def test_long_video_transcription(model: Whisper):
     video_file = str(file_for_test("long-video.mp4"))
     transcription: str = model.transcribe_file(video_file)

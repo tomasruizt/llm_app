@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from logging import getLogger
+from typing import Any
 import torch
 from transformers import (
     AutoModelForSpeechSeq2Seq,
@@ -49,18 +50,21 @@ class Whisper:
         default_factory=create_whisper_pipe
     )
 
-    def transcribe_file(self, file: str) -> str:
+    def transcribe_file(self, file: str, translate=False) -> str:
         assert isinstance(file, str)
         logger.info("Transcribing file: %s", file)
         try:
-            return self._transcribe(file, return_timestamps=False)
+            return self._transcribe(file, translate, return_timestamps=False)
         except ValueError as e:
             if "Please either pass `return_timestamps=True`" in repr(e):
                 logger.info("File is >30s, transcribing with timestamps: %s", file)
-                return self._transcribe(file, return_timestamps=True)
+                return self._transcribe(file, translate, return_timestamps=True)
             raise
 
-    def _transcribe(self, file: str, return_timestamps: bool) -> str:
+    def _transcribe(self, file: str, translate: bool, return_timestamps: bool) -> str:
+        kwargs: dict[str, Any] = {"return_timestamps": return_timestamps}
+        if translate:
+            kwargs["generate_kwargs"] = {"language": "english"}
         # data["chunks"] contains the timestamped transcriptions
-        data = self.pipe(file, return_timestamps=return_timestamps)
+        data = self.pipe(file, **kwargs)
         return data["text"].strip()
