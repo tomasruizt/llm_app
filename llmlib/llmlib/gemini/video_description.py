@@ -3,11 +3,14 @@ Based on https://github.com/google-gemini/cookbook/blob/main/quickstarts/Video.i
 """
 
 from dataclasses import dataclass
+from logging import getLogger
 import os
 from pathlib import Path
 from typing import Literal
 import google.generativeai as genai
 import time
+
+logger = getLogger(__name__)
 
 
 @dataclass
@@ -23,29 +26,27 @@ class Request:
 
 
 def fetch_video_description(req: Request) -> str:
-    # TODO: Replace print with logger.info
     # TODO: Always delete the video in the end. Perhaps use finally block.
     genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
-    print("Uploading file...")
+    logger.info("Uploading file: '%s'", req.video_path)
     video_file = genai.upload_file(path=req.video_path)
-    print(f"Completed upload: {video_file.uri}")
+    logger.info("Completed upload. URI='%s'", video_file.uri)
 
     while video_file.state.name == "PROCESSING":
-        print("Waiting for video to be processed.")
+        logger.info("Waiting for video to be processed: %s", video_file.uri)
         time.sleep(1)
         video_file = genai.get_file(video_file.name)
 
     if video_file.state.name == "FAILED":
         raise ValueError(video_file.state.name)
-    print("Video processing complete: " + video_file.uri)
+    logger.info("Video processing complete: %s", video_file.uri)
 
     model = genai.GenerativeModel(model_name=req.model_name)
-
     prompt = req.prompt
-    print("prompt:", prompt)
-    print("model_name:", req.model_name)
-    print("Calling the Google API...")
+    logger.info(
+        "Calling the Google API. Prompt='%s', model_name='%s'", prompt, req.model_name
+    )
     response = model.generate_content(
         [prompt, video_file],
         request_options={"timeout": 600},
@@ -56,7 +57,7 @@ def fetch_video_description(req: Request) -> str:
         raise UnsafeResponseError(safety_ratings=response.candidates[0].safety_ratings)
 
     genai.delete_file(video_file.name)
-    print(f"Deleted file {video_file.uri}")
+    logger.info("Deleted file: '%s'", video_file.uri)
 
     return response.text
 
