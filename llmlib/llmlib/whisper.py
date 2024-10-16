@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from logging import getLogger
 from typing import Any
+import warnings
 import torch
 from transformers import (
     AutoModelForSpeechSeq2Seq,
@@ -65,6 +66,9 @@ class Whisper:
         kwargs: dict[str, Any] = {"return_timestamps": return_timestamps}
         if translate:
             kwargs["generate_kwargs"] = {"language": "english"}
-        # data["chunks"] contains the timestamped transcriptions
-        data = self.pipe(file, **kwargs)
+        # ignore this warning:
+        # .../site-packages/transformers/models/whisper/generation_whisper.py:496: FutureWarning: The input name `inputs` is deprecated. Please make sure to use `input_features` instead.
+        with warnings.catch_warnings(action="ignore", category=FutureWarning):
+            # data["chunks"] contains the timestamped transcriptions
+            data = self.pipe(file, **kwargs)
         return data["text"].strip()
