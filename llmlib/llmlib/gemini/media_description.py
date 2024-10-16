@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 from typing import Literal
 import google.generativeai as genai
+from google.generativeai.types.file_types import File as GoogleFile
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import time
 
 logger = getLogger(__name__)
@@ -15,7 +17,7 @@ logger = getLogger(__name__)
 
 @dataclass
 class Request:
-    media_file: Path
+    media_files: list[Path]
     model_name: Literal["models/gemini-1.5-pro", "models/gemini-1.5-flash"] = (
         "models/gemini-1.5-pro"
     )
@@ -29,18 +31,13 @@ def fetch_media_description(req: Request) -> str:
     # TODO: Always delete the video in the end. Perhaps use finally block.
     genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
-    logger.info("Uploading file: '%s'", req.media_file)
-    file = genai.upload_file(path=req.media_file)
-    logger.info("Completed upload. URI='%s'", file.uri)
+    logger.info("Uploading %d file(s)", len(req.media_files))
+    files: list[GoogleFile] = [genai.upload_file(path=f) for f in req.media_files]
+    logger.info("Completed uploading %d file(s)", len(files))
 
-    while file.state.name == "PROCESSING":
-        logger.info("Waiting for file to be processed: %s", file.uri)
-        time.sleep(1)
-        file = genai.get_file(file.name)
-
-    if file.state.name == "FAILED":
-        raise ValueError(file.state.name)
-    logger.info("File processing complete: %s", file.uri)
+    for file in files:
+        _wait_for_file_processing(file)
+    logger.info("File processing complete")
 
     model = genai.GenerativeModel(model_name=req.model_name)
     prompt = req.prompt
@@ -48,9 +45,10 @@ def fetch_media_description(req: Request) -> str:
         "Calling the Google API. Prompt='%s', model_name='%s'", prompt, req.model_name
     )
     response = model.generate_content(
-        [prompt, file],
+        [prompt, *files],
         request_options={"timeout": 600},
         generation_config={"temperature": 0.0},
+        safety_settings=_block_nothing(),
     )
     if len(response.candidates) == 0:
         raise ValueError(
@@ -61,13 +59,36 @@ def fetch_media_description(req: Request) -> str:
     if response.candidates[0].finish_reason == enum.SAFETY:
         raise UnsafeResponseError(safety_ratings=response.candidates[0].safety_ratings)
 
-    genai.delete_file(file.name)
-    logger.info("Deleted file: '%s'", file.uri)
+    for file in files:
+        genai.delete_file(file.name)
+        logger.info("Deleted file: '%s'", file.uri)
 
     return response.text
 
 
+def _block_nothing() -> dict[HarmCategory, HarmBlockThreshold]:
+    return {
+        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+    }
+
+
+def _wait_for_file_processing(file: GoogleFile) -> None:
+    while file.state.name == "PROCESSING":
+        logger.info("Waiting for file to be processed: %s", file.uri)
+        time.sleep(1)
+        file = genai.get_file(file.name)
+
+    if file.state.name == "FAILED":
+        raise ValueError(file.state.name)
+
+
 class UnsafeResponseError(Exception):
     def __init__(self, safety_ratings: list) -> None:
-        super().__init__("The response was blocked by Google due to safety reasons.")
+        super().__init__(
+            "The response was blocked by Google due to safety reasons. Categories: %s"
+            % safety_ratings
+        )
         self.safety_categories = safety_ratings
