@@ -76,7 +76,7 @@ def mona_lisa_message() -> Message:
 
 
 def pyramid_message() -> Message:
-    img_name = "pyarmid.jpg"
+    img_name = "pyramid.jpg"
     img = get_test_img(img_name)
     msg = Message(role="user", msg="What is in the image?", img=img, img_name="")
     return msg
