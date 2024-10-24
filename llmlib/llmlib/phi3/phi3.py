@@ -73,13 +73,13 @@ def extract_imgs_and_dicts(msgs: list[Message]) -> tuple[list[Image.Image], list
     return images, messages
 
 
-def create_model():
+def create_model(model_id: str = model_id):
     return AutoModelForCausalLM.from_pretrained(
         model_id, device_map="cuda", trust_remote_code=True, torch_dtype="auto"
     )
 
 
-def create_processor():
+def create_processor(model_id: str = model_id):
     return AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
 
 
