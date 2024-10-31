@@ -15,12 +15,15 @@ import time
 logger = getLogger(__name__)
 
 
+_pro = "models/gemini-1.5-pro"
+_flash = "models/gemini-1.5-flash"
+available_models = [_pro, _flash]
+
+
 @dataclass
 class Request:
     media_files: list[Path]
-    model_name: Literal["models/gemini-1.5-pro", "models/gemini-1.5-flash"] = (
-        "models/gemini-1.5-pro"
-    )
+    model_name: Literal[_pro, _flash] = _pro
     prompt: str = "Describe this video in detail."
 
     def fetch_media_description(self) -> str:
