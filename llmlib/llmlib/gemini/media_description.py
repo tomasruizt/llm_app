@@ -80,12 +80,17 @@ def _block_nothing() -> dict[HarmCategory, HarmBlockThreshold]:
 
 def _wait_for_file_processing(file: GoogleFile) -> None:
     i = 0
+    limit = 60
     while file.state.name == "PROCESSING":
         if i % 5 == 0:
             logger.info("Waiting for file to be processed: %s", file.uri)
         time.sleep(1)
         i += 1
         file = genai.get_file(file.name)
+        if i >= limit:
+            raise TimeoutError(
+                "File processing took timed out after {%d}s: %s" % (limit, file.uri)
+            )
 
     if file.state.name == "FAILED":
         raise ValueError(file.state.name)
