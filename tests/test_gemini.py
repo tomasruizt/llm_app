@@ -22,4 +22,4 @@ def test_gemini_vision():
     description: str = req.fetch_media_description().lower()
     assert "pyramid" in description
     assert "mona lisa" in description
-    assert "a character named vera enters a room" in description
+    assert "small black pig" in description
