@@ -45,7 +45,9 @@ def fetch_media_description(req: Request) -> str:
     model = genai.GenerativeModel(model_name=req.model_name)
     prompt = req.prompt
     logger.info(
-        "Calling the Google API. Prompt='%s', model_name='%s'", prompt, req.model_name
+        "Calling the Google API. Prompt='%s', model_name='%s'",
+        shorten_str(prompt),
+        req.model_name,
     )
     response = model.generate_content(
         [prompt, *files],
@@ -94,6 +96,12 @@ def _wait_for_file_processing(file: GoogleFile) -> None:
 
     if file.state.name == "FAILED":
         raise ValueError(file.state.name)
+
+
+def shorten_str(s: str) -> str:
+    if len(s) > 100:
+        return s[:100] + "..."
+    return s
 
 
 class UnsafeResponseError(Exception):
