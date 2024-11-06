@@ -47,11 +47,7 @@ def fetch_media_description(req: Request) -> str:
     model = GenerativeModel(req.model_name)
 
     prompt = req.prompt
-    logger.info(
-        "Calling the Google API. Prompt='%s', model_name='%s'",
-        shorten_str(prompt),
-        req.model_name,
-    )
+    logger.info("Calling the Google API. model_name='%s'", req.model_name)
     contents = [
         Part.from_uri(f"gs://{bucket_name}/{b.name}", mime_type=mime_type(b.name))
         for b in blobs
@@ -75,7 +71,7 @@ def fetch_media_description(req: Request) -> str:
 
     for blob in blobs:
         blob.delete()
-        logger.info("Deleted blob: '%s'", blob.name)
+    logger.info("Deleted %d blob(s)", len(blobs))
 
     return response.text
 
@@ -118,12 +114,6 @@ def _block_nothing() -> dict[HarmCategory, HarmBlockThreshold]:
         HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
         HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY: HarmBlockThreshold.BLOCK_NONE,
     }
-
-
-def shorten_str(s: str) -> str:
-    if len(s) > 100:
-        return s[:100] + "..."
-    return s
 
 
 class UnsafeResponseError(Exception):
