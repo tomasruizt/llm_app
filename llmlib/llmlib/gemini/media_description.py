@@ -1,19 +1,28 @@
 """
-Based on https://github.com/google-gemini/cookbook/blob/main/quickstarts/Video.ipynb
+Based on https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/video-understanding
 """
 
 from dataclasses import dataclass
 from logging import getLogger
-import os
 from pathlib import Path
 from typing import Literal
-import google.generativeai as genai
-from google.generativeai.types.file_types import File as GoogleFile
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
-import time
+from google.cloud import storage
+import proto
+from vertexai.generative_models import (
+    GenerativeModel,
+    Part,
+    HarmCategory,
+    HarmBlockThreshold,
+    GenerationResponse,
+)
+
+import vertexai
 
 logger = getLogger(__name__)
 
+project_id = "css-lehrbereich"  # from google cloud console
+frankfurt = "europe-west3"  # https://cloud.google.com/about/locations#europe
+bucket_name = "css-temp-bucket-for-vertex"
 
 _pro = "models/gemini-1.5-pro"
 _flash = "models/gemini-1.5-flash"
@@ -32,70 +41,83 @@ class Request:
 
 def fetch_media_description(req: Request) -> str:
     # TODO: Always delete the video in the end. Perhaps use finally block.
-    genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+    blobs = _upload_files(files=req.media_files)
 
-    logger.info("Uploading %d file(s)", len(req.media_files))
-    files: list[GoogleFile] = [genai.upload_file(path=f) for f in req.media_files]
-    logger.info("Completed uploading %d file(s)", len(files))
+    vertexai.init(project=project_id, location=frankfurt)
+    model = GenerativeModel(req.model_name)
 
-    for file in files:
-        _wait_for_file_processing(file)
-    logger.info("File processing complete")
-
-    model = genai.GenerativeModel(model_name=req.model_name)
     prompt = req.prompt
     logger.info(
         "Calling the Google API. Prompt='%s', model_name='%s'",
         shorten_str(prompt),
         req.model_name,
     )
-    response = model.generate_content(
-        [prompt, *files],
-        request_options={"timeout": 600},
+    contents = [
+        Part.from_uri(f"gs://{bucket_name}/{b.name}", mime_type=mime_type(b.name))
+        for b in blobs
+    ]
+    contents.append(prompt)
+    response: GenerationResponse = model.generate_content(
+        contents=contents,
         generation_config={"temperature": 0.0},
         safety_settings=_block_nothing(),
     )
+    logger.info("Token usage: %s", proto.Message.to_dict(response.usage_metadata))
+
     if len(response.candidates) == 0:
         raise ResponseRefusedException(
             "No candidates in response. prompt_feedback='%s'" % response.prompt_feedback
         )
 
     enum = type(response.candidates[0].finish_reason)
-    if response.candidates[0].finish_reason == enum.SAFETY:
+    if response.candidates[0].finish_reason in {enum.SAFETY, enum.PROHIBITED_CONTENT}:
         raise UnsafeResponseError(safety_ratings=response.candidates[0].safety_ratings)
 
-    for file in files:
-        genai.delete_file(file.name)
-        logger.info("Deleted file: '%s'", file.uri)
+    for blob in blobs:
+        blob.delete()
+        logger.info("Deleted blob: '%s'", blob.name)
 
     return response.text
 
 
+def mime_type(file_name: str) -> str:
+    mapping = {
+        ".txt": "text/plain",
+        ".jpg": "image/jpeg",
+        ".png": "image/png",
+        ".flac": "audio/flac",
+        ".mp3": "audio/mpeg",
+        ".mp4": "video/mp4",
+    }
+    for ext, mime in mapping.items():
+        if file_name.endswith(ext):
+            return mime
+    raise ValueError(f"Unknown mime type for file: {file_name}")
+
+
+def _upload_files(files: list[Path]) -> list[storage.Blob]:
+    logger.info("Uploading %d file(s)", len(files))
+    client = storage.Client(project=project_id)
+    bucket = client.bucket(bucket_name)
+    blobs = []
+    for file in files:
+        blob = bucket.blob(file.name)
+        blobs.append(blob)
+        if not blob.exists():
+            blob.upload_from_filename(str(file), if_generation_match=0)
+    logger.info("Completed uploading %d file(s)", len(files))
+    return blobs
+
+
 def _block_nothing() -> dict[HarmCategory, HarmBlockThreshold]:
     return {
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_UNSPECIFIED: HarmBlockThreshold.BLOCK_NONE,
         HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY: HarmBlockThreshold.BLOCK_NONE,
     }
-
-
-def _wait_for_file_processing(file: GoogleFile) -> None:
-    i = 0
-    limit = 120  # seconds
-    while file.state.name == "PROCESSING":
-        if i % 5 == 0:
-            logger.info("Waiting for file to be processed: %s", file.uri)
-        time.sleep(1)
-        i += 1
-        file = genai.get_file(file.name)
-        if i >= limit:
-            raise TimeoutError(
-                "File processing took timed out after %ds: %s" % (limit, file.uri)
-            )
-
-    if file.state.name == "FAILED":
-        raise ValueError(file.state.name)
 
 
 def shorten_str(s: str) -> str:

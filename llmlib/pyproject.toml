@@ -7,9 +7,9 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-google-generativeai = "^0.7.2"
 bugsnag = "^4.7.1"
 decord = "^0.6.0"
+google-cloud-aiplatform = "^1.64"
 # I cannot add the dependencies below. I suspect that torch is a build-time dependency for flash-attn, or something like that.
 # transformers = "^4.44.2"
 # accelerate = "^0.34.2"

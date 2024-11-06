@@ -10,7 +10,7 @@ def test_gemini_vision():
     files: list[Path] = [
         file_for_test("pyramid.jpg"),
         file_for_test("mona-lisa.png"),
-        file_for_test("some-audio.flac"),
+        file_for_test("some-audio.mp3"),
     ]
 
     for path in files:
@@ -22,4 +22,4 @@ def test_gemini_vision():
     description: str = req.fetch_media_description().lower()
     assert "pyramid" in description
     assert "mona lisa" in description
-    assert "small black pig" in description
+    assert "horses are very fast" in description
