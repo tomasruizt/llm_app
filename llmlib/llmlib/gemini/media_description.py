@@ -22,17 +22,30 @@ logger = getLogger(__name__)
 
 project_id = "css-lehrbereich"  # from google cloud console
 frankfurt = "europe-west3"  # https://cloud.google.com/about/locations#europe
-bucket_name = "css-temp-bucket-for-vertex"
 
-_pro = "models/gemini-1.5-pro"
-_flash = "models/gemini-1.5-flash"
-available_models = [_pro, _flash]
+
+class Buckets:
+    temp = "css-temp-bucket-for-vertex"
+    output = "css-vertex-output"
+
+
+def storage_uri(bucket: str, blob_name: str) -> str:
+    """blob_name starts without a slash"""
+    return "gs://%s/%s" % (bucket, blob_name)
+
+
+class Models:
+    gemini_pro = "models/gemini-1.5-pro"
+    gemini_flash = "models/gemini-1.5-flash"
+
+
+available_models = [Models.gemini_pro, Models.gemini_flash]
 
 
 @dataclass
 class Request:
     media_files: list[Path]
-    model_name: Literal[_pro, _flash] = _pro
+    model_name: Literal[Models.gemini_pro, Models.gemini_flash] = Models.gemini_pro
     prompt: str = "Describe this video in detail."
 
     def fetch_media_description(self) -> str:
@@ -41,22 +54,22 @@ class Request:
 
 def fetch_media_description(req: Request) -> str:
     # TODO: Always delete the video in the end. Perhaps use finally block.
-    blobs = _upload_files(files=req.media_files)
+    blobs = upload_files(files=req.media_files)
 
-    vertexai.init(project=project_id, location=frankfurt)
+    init_vertex()
     model = GenerativeModel(req.model_name)
 
     prompt = req.prompt
     logger.info("Calling the Google API. model_name='%s'", req.model_name)
     contents = [
-        Part.from_uri(f"gs://{bucket_name}/{b.name}", mime_type=mime_type(b.name))
+        Part.from_uri(storage_uri(Buckets.temp, b.name), mime_type=mime_type(b.name))
         for b in blobs
     ]
     contents.append(prompt)
     response: GenerationResponse = model.generate_content(
         contents=contents,
         generation_config={"temperature": 0.0},
-        safety_settings=_block_nothing(),
+        safety_settings=block_nothing(),
     )
     logger.info("Token usage: %s", proto.Message.to_dict(response.usage_metadata))
 
@@ -76,6 +89,10 @@ def fetch_media_description(req: Request) -> str:
     return response.text
 
 
+def init_vertex() -> None:
+    vertexai.init(project=project_id, location=frankfurt)
+
+
 def mime_type(file_name: str) -> str:
     mapping = {
         ".txt": "text/plain",
@@ -91,10 +108,9 @@ def mime_type(file_name: str) -> str:
     raise ValueError(f"Unknown mime type for file: {file_name}")
 
 
-def _upload_files(files: list[Path]) -> list[storage.Blob]:
+def upload_files(files: list[Path]) -> list[storage.Blob]:
     logger.info("Uploading %d file(s)", len(files))
-    client = storage.Client(project=project_id)
-    bucket = client.bucket(bucket_name)
+    bucket = _bucket(name=Buckets.temp)
     blobs = []
     for file in files:
         blob = bucket.blob(file.name)
@@ -105,7 +121,22 @@ def _upload_files(files: list[Path]) -> list[storage.Blob]:
     return blobs
 
 
-def _block_nothing() -> dict[HarmCategory, HarmBlockThreshold]:
+def _bucket(name: str) -> storage.Bucket:
+    client = storage.Client(project=project_id)
+    return client.bucket(name)
+
+
+def upload_single_file(file: Path, bucket: str, blob_name: str) -> storage.Blob:
+    logger.info("Uploading file '%s' to bucket '%s' as '%s'", file, bucket, blob_name)
+    bucket: storage.Bucket = _bucket(name=bucket)
+    blob = bucket.blob(blob_name)
+    if blob.exists():
+        logger.info("Blob '%s' already exists. Overwriting it...", blob_name)
+    blob.upload_from_filename(str(file))
+    return blob
+
+
+def block_nothing() -> dict[HarmCategory, HarmBlockThreshold]:
     return {
         HarmCategory.HARM_CATEGORY_UNSPECIFIED: HarmBlockThreshold.BLOCK_NONE,
         HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
