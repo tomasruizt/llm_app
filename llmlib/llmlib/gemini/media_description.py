@@ -7,6 +7,7 @@ from logging import getLogger
 from pathlib import Path
 from typing import Literal
 from google.cloud import storage
+from google.cloud.storage import transfer_manager
 import proto
 from vertexai.generative_models import (
     GenerativeModel,
@@ -111,18 +112,14 @@ def mime_type(file_name: str) -> str:
 def upload_files(files: list[Path]) -> list[storage.Blob]:
     logger.info("Uploading %d file(s)", len(files))
     bucket = _bucket(name=Buckets.temp)
-    blobs = []
-    existed = 0
-    uploaded = 0
-    for file in files:
-        blob = bucket.blob(file.name)
-        blobs.append(blob)
-        if not blob.exists():
-            blob.upload_from_filename(str(file), if_generation_match=0)
-            uploaded += 1
-        else:
-            existed += 1
-    logger.info("Completed. uploaded_now=%d existed_before=%d", uploaded, existed)
+    files_str = [str(f) for f in files]
+    blobs = [bucket.blob(file.name) for file in files]
+    transfer_manager.upload_many(
+        file_blob_pairs=zip(files_str, blobs),
+        skip_if_exists=True,
+        raise_exception=True,
+    )
+    logger.info("Completed file(s) upload")
     return blobs
 
 
