@@ -112,12 +112,17 @@ def upload_files(files: list[Path]) -> list[storage.Blob]:
     logger.info("Uploading %d file(s)", len(files))
     bucket = _bucket(name=Buckets.temp)
     blobs = []
+    existed = 0
+    uploaded = 0
     for file in files:
         blob = bucket.blob(file.name)
         blobs.append(blob)
         if not blob.exists():
             blob.upload_from_filename(str(file), if_generation_match=0)
-    logger.info("Completed uploading %d file(s)", len(files))
+            uploaded += 1
+        else:
+            existed += 1
+    logger.info("Completed. uploaded_now=%d existed_before=%d", uploaded, existed)
     return blobs
 
 
