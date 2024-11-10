@@ -19,10 +19,15 @@ class MiniCPM(LLM):
     model_id = _model_name
     requires_gpu_exclusively = True
 
-    def __init__(self, temperature: float = 0.0) -> None:
-        self.model = _create_model()
+    def __init__(self, temperature: float = 0.0, model=None) -> None:
+        if model is None:
+            model = _create_model()
+        self.model = model
         self.tokenizer = _create_tokenizer()
         self.temperature = temperature
+
+    def chat(self, prompt: str) -> str:
+        return self.complete_msgs2([Message(role="user", msg=prompt)])
 
     def complete_msgs2(self, msgs: list[Message]) -> str:
         dict_msgs = [_convert_msg_to_dict(m) for m in msgs]
