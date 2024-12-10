@@ -4,6 +4,7 @@ x-common-gpu: &common-gpu
   environment:
     - OPENAI_API_KEY=${OPENAI_API_KEY}
     - HF_HOME=/app/.cache/huggingface
+    - HF_TOKEN=${HF_TOKEN}
     - LLMS_REST_API_KEY=${LLMS_REST_API_KEY}
     - BUGSNAG_API_KEY=${BUGSNAG_API_KEY}
   deploy:

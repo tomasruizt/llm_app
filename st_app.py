@@ -5,9 +5,10 @@ from llmlib.model_registry import ModelEntry, ModelRegistry
 from llmlib.base_llm import Message
 from llmlib.bundler import Bundler
 from llmlib.bundler_request import BundlerRequest
+from login_mask_simple import check_password
 
-# if not check_password():
-# st.stop()
+if not check_password():
+    st.stop()
 
 st.set_page_config(page_title="LLM App", layout="wide")
 
