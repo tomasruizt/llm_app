@@ -16,6 +16,7 @@ from vertexai.generative_models import (
     HarmBlockThreshold,
     GenerationResponse,
 )
+from ..error_handling import notify_bugsnag
 
 import vertexai
 
@@ -53,6 +54,7 @@ class Request:
         return fetch_media_description(self)
 
 
+@notify_bugsnag
 def fetch_media_description(req: Request) -> str:
     # TODO: Always delete the video in the end. Perhaps use finally block.
     blobs = upload_files(files=req.media_files)
