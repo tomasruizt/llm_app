@@ -8,7 +8,7 @@ from PIL import Image
 from llmlib.base_llm import LLM
 from transformers.image_processing_utils import BatchFeature
 
-model_id = "microsoft/Phi-3-vision-128k-instruct"
+model_id = "microsoft/Phi-3.5-vision-instruct"
 
 
 @dataclass
