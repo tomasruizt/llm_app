@@ -3,8 +3,11 @@ Based on https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/video-
 """
 
 from dataclasses import dataclass
+from functools import singledispatchmethod
+from io import BytesIO
 from logging import getLogger
 from pathlib import Path
+import tempfile
 from typing import Literal
 from google.cloud import storage
 from google.cloud.storage import transfer_manager
@@ -16,6 +19,7 @@ from vertexai.generative_models import (
     HarmBlockThreshold,
     GenerationResponse,
 )
+from ..base_llm import LLM, Message
 from ..error_handling import notify_bugsnag
 
 import vertexai
@@ -49,6 +53,7 @@ class Request:
     media_files: list[Path]
     model_name: Literal[Models.gemini_pro, Models.gemini_flash] = Models.gemini_pro
     prompt: str = "Describe this video in detail."
+    max_output_tokens: int = 1000
 
     def fetch_media_description(self) -> str:
         return fetch_media_description(self)
@@ -71,7 +76,10 @@ def fetch_media_description(req: Request) -> str:
     contents.append(prompt)
     response: GenerationResponse = model.generate_content(
         contents=contents,
-        generation_config={"temperature": 0.0},
+        generation_config={
+            "temperature": 0.0,
+            "max_output_tokens": req.max_output_tokens,
+        },
         safety_settings=block_nothing(),
     )
     logger.info("Token usage: %s", proto.Message.to_dict(response.usage_metadata))
@@ -162,3 +170,43 @@ class UnsafeResponseError(Exception):
 
 class ResponseRefusedException(Exception):
     pass
+
+
+@dataclass
+class GeminiAPI(LLM):
+    model_id: str = Models.gemini_pro
+    max_output_tokens: int = 1000
+    requires_gpu_exclusively: bool = False
+
+    def complete_msgs2(self, msgs: list[Message]) -> str:
+        if len(msgs) != 1:
+            raise ValueError("GeminiAPI only supports one message")
+
+        msg = msgs[0]
+        paths: list[Path] = []
+        if msg.has_image():
+            temp_file = tempfile.mktemp(suffix=".jpg")
+            msg.img.save(temp_file)
+            paths.append(Path(temp_file))
+        if msg.has_video():
+            temp_file = tempfile.mktemp(suffix=".mp4")
+            msg.video.save(temp_file)
+            paths.append(Path(temp_file))
+
+        req = Request(model_name=self.model_id, media_files=paths, prompt=msg.msg)
+        return req.fetch_media_description()
+
+    @singledispatchmethod
+    def video_prompt(self, video, prompt: str) -> str:
+        raise NotImplementedError
+
+    @video_prompt.register
+    def _(self, video: Path, prompt: str) -> str:
+        req = Request(model_name=self.model_id, media_files=[video], prompt=prompt)
+        return req.fetch_media_description()
+
+    @video_prompt.register
+    def _(self, video: BytesIO, prompt: str) -> str:
+        path = tempfile.mktemp(suffix=".mp4")
+        video.save(path)
+        return self.video_prompt(path, prompt)

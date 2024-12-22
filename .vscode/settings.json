@@ -1,6 +1,6 @@
 {
     "python.testing.pytestArgs": [
-        "."
+        "tests", "--log-cli-level=INFO", "-v", "--durations=0", "--capture=no"
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,

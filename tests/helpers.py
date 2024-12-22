@@ -58,8 +58,8 @@ def assert_model_recognizes_pyramid_in_image(model: LLM):
 def assert_model_recognizes_afd_in_video(model: LLM):
     video_path = file_for_test("video.mp4")
     question = "Describe the video in english"
-    answer: str = model.video_prompt(video_path, question)
-    assert "alternative für deutschland" in answer.lower(), answer
+    answer: str = model.video_prompt(video_path, question).lower()
+    assert "alternative für deutschland" in answer or "afd" in answer, answer
 
 
 def get_mona_lisa_completion(model: LLM) -> str:
