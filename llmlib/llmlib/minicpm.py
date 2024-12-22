@@ -1,3 +1,4 @@
+from io import BytesIO
 import logging
 from pathlib import Path
 from typing import Any
@@ -41,8 +42,8 @@ class MiniCPM(LLM):
         )
         return res
 
-    def video_prompt(self, video_path: Path, prompt: str) -> str:
-        return video_prompt(self, video_path, prompt)
+    def video_prompt(self, video: Path | BytesIO, prompt: str) -> str:
+        return video_prompt(self, video, prompt)
 
 
 def _create_tokenizer():
@@ -68,14 +69,17 @@ def _convert_msg_to_dict(msg: Message) -> dict:
     return {"role": msg.role, "content": content}
 
 
-def to_listof_imgs(video_path: Path) -> list[Image.Image]:
+def to_listof_imgs(video: Path | BytesIO) -> list[Image.Image]:
     """
     Return one frame per second from the video.
     If the video is longer than MAX_NUM_FRAMES, sample MAX_NUM_FRAMES frames.
     """
     MAX_NUM_FRAMES = 64  # if cuda OOM set a smaller number
-    assert video_path.exists(), video_path
-    vr = VideoReader(str(video_path), ctx=cpu(0))
+    if isinstance(video, Path):
+        assert video.exists(), video
+        vr = VideoReader(str(video), ctx=cpu(0))
+    else:
+        vr = VideoReader(BytesIO(video.read()), ctx=cpu(0))
     sample_fps = round(vr.get_avg_fps() / 1)  # FPS
     frame_idx = [i for i in range(0, len(vr), sample_fps)]
     if len(frame_idx) > MAX_NUM_FRAMES:
@@ -91,8 +95,8 @@ def uniform_sample(xs, n):
     return [xs[i] for i in idxs]
 
 
-def video_prompt(self: MiniCPM, video_path: Path, prompt: str) -> str:
-    imgs = to_listof_imgs(video_path)
+def video_prompt(self: MiniCPM, video: Path | BytesIO, prompt: str) -> str:
+    imgs = to_listof_imgs(video)
     logger.info("Video turned into %d images", len(imgs))
     msgs = [
         {"role": "user", "content": [prompt] + imgs},

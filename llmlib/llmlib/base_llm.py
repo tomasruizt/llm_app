@@ -1,3 +1,4 @@
+from io import BytesIO
 from pathlib import Path
 from typing import Literal, Self
 from PIL import Image
@@ -12,6 +13,7 @@ class Message:
     msg: str
     img_name: str | None = None
     img: Image.Image | None = None
+    video_path: Path | None = None
 
     @classmethod
     def from_prompt(cls, prompt: str) -> Self:
@@ -28,7 +30,7 @@ class LLM:
     def complete_batch(self, batch: list[list[Message]]) -> list[str]:
         raise NotImplementedError
 
-    def video_prompt(self, video_path: Path, prompt: str) -> str:
+    def video_prompt(self, video: Path | BytesIO, prompt: str) -> str:
         raise NotImplementedError
 
     @classmethod
