@@ -1,13 +1,12 @@
 from llmlib.base_llm import LLM, Message
-from transformers import (
-    PaliGemmaProcessor,
-    PaliGemmaForConditionalGeneration,
-)
+from transformers import PaliGemmaProcessor, PaliGemmaForConditionalGeneration
 import torch
 
 
 class PaliGemma2(LLM):
-    model_id = "google/paligemma2-3b-ft-docci-448"
+    # model_id = "google/paligemma2-3b-ft-docci-448"  DOCCI is more verbose but does not speak about implicit meanings in the image.
+    model_id = "google/paligemma2-3b-pt-896"
+    requires_gpu_exclusively = True
 
     def __init__(self):
         self.model = PaliGemmaForConditionalGeneration.from_pretrained(
@@ -38,3 +37,11 @@ class PaliGemma2(LLM):
             generation = generation[0][input_len:]
             decoded: str = self.processor.decode(generation, skip_special_tokens=True)
             return decoded
+
+    @classmethod
+    def get_warnings(cls) -> list[str]:
+        return [
+            "This model only accepts one message by the user at a time.",
+            "This model REQUIRES an image.",
+            "PaliGemma2 is only pretrained and might not follow instructions well.",
+        ]

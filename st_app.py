@@ -26,7 +26,8 @@ def create_model_bundler() -> Bundler:
 def display_warnings(r: ModelRegistry, model_id: str) -> None:
     e1: ModelEntry = r.get_entry(model_id)
     if len(e1.warnings) > 0:
-        st.warning("  \n".join(e1.warnings))
+        txt = ["* " + e for e in e1.warnings]
+        st.warning("\n".join(txt))
 
 
 cs = st.columns(2)

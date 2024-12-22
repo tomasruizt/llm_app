@@ -41,7 +41,8 @@
                 "run",
                 "st_app.py"
             ],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}",
+            "env": {"USE_STREAMLIT_PASSWORD": "false"}
         }
     ]
 }
