@@ -25,7 +25,13 @@ class Bundler:
     def get_response(self, req: BundlerRequest) -> str:
         e: ModelEntry = self.registry.get_entry(model_id=req.model_id)
         model: LLM = self._get_model_instance(e=e)
-        return model.complete_msgs2(req.msgs)
+        last_msg = req.msgs[-1]
+        if last_msg.has_image():
+            return model.complete_msgs2(req.msgs)
+        elif last_msg.has_video():
+            return model.video_prompt(last_msg.video, last_msg.msg)
+        else:
+            raise ValueError("Last message must have an image or video")
 
     def _get_model_instance(self, e: ModelEntry) -> LLM:
         if e.clazz.requires_gpu_exclusively:

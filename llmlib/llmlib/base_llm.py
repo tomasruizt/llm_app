@@ -13,11 +13,17 @@ class Message:
     msg: str
     img_name: str | None = None
     img: Image.Image | None = None
-    video_path: Path | None = None
+    video: Path | BytesIO | None = None
 
     @classmethod
     def from_prompt(cls, prompt: str) -> Self:
         return cls(role="user", msg=prompt)
+
+    def has_video(self) -> bool:
+        return self.video is not None
+
+    def has_image(self) -> bool:
+        return self.img is not None
 
 
 class LLM:

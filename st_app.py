@@ -1,3 +1,4 @@
+from io import BytesIO
 from PIL import Image
 import streamlit as st
 from llmlib.runtime import filled_model_registry
@@ -5,6 +6,7 @@ from llmlib.model_registry import ModelEntry, ModelRegistry
 from llmlib.base_llm import Message
 from llmlib.bundler import Bundler
 from llmlib.bundler_request import BundlerRequest
+from st_helpers import is_image, is_video
 from login_mask_simple import check_password
 
 if not check_password():
@@ -37,7 +39,9 @@ with cs[0]:
 with cs[1]:
     if "img-key" not in st.session_state:
         st.session_state["img-key"] = 0
-    image = st.file_uploader("Include an image", key=st.session_state["img-key"])
+    media_file = st.file_uploader(
+        "Include an image/video", key=st.session_state["img-key"]
+    )
 
 if "messages1" not in st.session_state:
     st.session_state.messages1 = []  # list[Message]
@@ -55,13 +59,21 @@ def render_messages(msgs: list[Message]) -> None:
 
 def render_message(msg: Message):
     with st.chat_message(msg.role):
-        if msg.img_name is not None:
+        if msg.has_image():
             render_img(msg)
+        if msg.has_video():
+            render_video(msg)
         st.markdown(msg.msg)
 
 
 def render_img(msg: Message):
     st.image(msg.img, caption=msg.img_name, width=400)
+
+
+def render_video(msg: Message):
+    cs = st.columns([1, 4])
+    with cs[0]:
+        st.video(msg.video)
 
 
 n_cols = 1
@@ -72,14 +84,26 @@ prompt = st.chat_input("Type here")
 if prompt is None:
     st.stop()
 
-msg = Message(
-    role="user",
-    msg=prompt,
-    img_name=image.name if image is not None else None,
-    img=Image.open(image) if image is not None else None,
-)
 
-if image is not None:
+if media_file is None:
+    msg = Message.from_prompt(prompt)
+elif is_video(media_file):
+    msg = Message(
+        role="user",
+        msg=prompt,
+        video=BytesIO(media_file.read()),
+    )
+elif is_image(media_file):
+    msg = Message(
+        role="user",
+        msg=prompt,
+        img_name=media_file.name,
+        img=Image.open(media_file),
+    )
+else:
+    raise ValueError(f"Unsupported file type: {media_file.name}")
+
+if media_file is not None:
     st.session_state["img-key"] += 1
 
 st.session_state.messages1.append(msg)
