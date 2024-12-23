@@ -18,6 +18,7 @@ def test_minicpm_vision():
     assert_model_recognizes_afd_in_video(model)
 
 
+@pytest.mark.skipif(condition=is_ci(), reason="video.mp4 does not exist in CI")
 def test_to_listof_imgs():
     video_path = file_for_test("video.mp4")
     imgs = to_listof_imgs(video_path)
