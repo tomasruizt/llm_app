@@ -1,3 +1,5 @@
+from .base_llm import LLM
+from .gemini.media_description import GeminiAPI
 from .gemma import PaliGemma2
 from .minicpm import MiniCPM
 from .llama3 import LLama3Vision8B
@@ -13,11 +15,21 @@ def filled_model_registry() -> ModelRegistry:
             ModelEntry.from_cls_with_id(MiniCPM),
             ModelEntry.from_cls_with_id(LLama3Vision8B),
             ModelEntry.from_cls_with_id(PaliGemma2),
-            *[
-                ModelEntry(
-                    model_id=id_, clazz=OpenAIModel, ctor=lambda: OpenAIModel(model=id_)
-                )
-                for id_ in OpenAIModel.model_ids
-            ],
+            *model_entries_from_mult_ids(OpenAIModel),
+            *model_entries_from_mult_ids(GeminiAPI),
         ]
     )
+
+
+def model_entries_from_mult_ids(cls: type[LLM]) -> list[ModelEntry]:
+    assert hasattr(cls, "model_ids")
+    entries = [
+        ModelEntry(
+            model_id=id_,
+            clazz=cls,
+            ctor=lambda: cls(model_id=id_),
+            warnings=cls.get_warnings(),
+        )
+        for id_ in cls.model_ids
+    ]
+    return entries

@@ -176,7 +176,9 @@ class ResponseRefusedException(Exception):
 class GeminiAPI(LLM):
     model_id: str = Models.gemini_pro
     max_output_tokens: int = 1000
-    requires_gpu_exclusively: bool = False
+
+    requires_gpu_exclusively = False
+    model_ids = [Models.gemini_pro, Models.gemini_flash]
 
     def complete_msgs2(self, msgs: list[Message]) -> str:
         if len(msgs) != 1:
@@ -198,7 +200,7 @@ class GeminiAPI(LLM):
 
     @singledispatchmethod
     def video_prompt(self, video, prompt: str) -> str:
-        raise NotImplementedError
+        raise NotImplementedError(f"Unsupported video type: {type(video)}")
 
     @video_prompt.register
     def _(self, video: Path, prompt: str) -> str:
@@ -208,5 +210,12 @@ class GeminiAPI(LLM):
     @video_prompt.register
     def _(self, video: BytesIO, prompt: str) -> str:
         path = tempfile.mktemp(suffix=".mp4")
-        video.save(path)
-        return self.video_prompt(path, prompt)
+        with open(path, "wb") as f:
+            f.write(video.getvalue())
+        return self.video_prompt(Path(path), prompt)
+
+    @classmethod
+    def get_warnings(cls) -> list[str]:
+        return [
+            "While Gemini supports multi-turn, and multi-file chat, we have only implemented single-file and single-turn prompts atm."
+        ]

@@ -1,4 +1,5 @@
 from io import BytesIO
+import logging
 from PIL import Image
 import streamlit as st
 from llmlib.runtime import filled_model_registry
@@ -8,6 +9,9 @@ from llmlib.bundler import Bundler
 from llmlib.bundler_request import BundlerRequest
 from st_helpers import is_image, is_video
 from login_mask_simple import check_password
+
+fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+logging.basicConfig(level=logging.INFO, format=fmt)
 
 if not check_password():
     st.stop()
