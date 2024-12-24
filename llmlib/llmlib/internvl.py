@@ -9,9 +9,10 @@ class InternVL(LLM):
         self.pipe = pipeline(self.model_id)
 
     def complete_msgs2(self, msgs: list[Message]) -> str:
-        if len(msgs) != 1:
-            raise ValueError("InternVL only supports one message")
-        imgs = []
-        if msgs[0].has_image():
-            imgs.append(msgs[0].img)
-        return self.pipe((msgs[0].msg, imgs)).text
+        session = None
+        for msg in msgs:
+            imgs = []
+            if msg.has_image():
+                imgs.append(msg.img)
+            session = self.pipe.chat((msg.msg, imgs), session=session)
+        return session.response.text

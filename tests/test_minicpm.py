@@ -6,6 +6,7 @@ from .helpers import (
     assert_model_knows_capital_of_france,
     assert_model_recognizes_afd_in_video,
     assert_model_recognizes_pyramid_in_image,
+    assert_model_supports_multiturn,
     file_for_test,
     is_ci,
 )
@@ -23,6 +24,7 @@ def test_internvl():
     model = InternVL()
     assert_model_knows_capital_of_france(model)
     assert_model_recognizes_pyramid_in_image(model)
+    assert_model_supports_multiturn(model)
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="video.mp4 does not exist in CI")

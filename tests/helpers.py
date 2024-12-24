@@ -121,3 +121,10 @@ def file_for_test(name: str) -> Path:
 def is_ci() -> bool:
     is_ci_str: str = os.environ.get("CI", "false").lower()
     return is_ci_str != "false"
+
+
+def assert_model_supports_multiturn(model: LLM):
+    msg1 = Message.from_prompt("My name is Tomas")
+    msg2 = Message.from_prompt("What is my name?")
+    answer = model.complete_msgs2([msg1, msg2])
+    assert "Tomas" in answer
