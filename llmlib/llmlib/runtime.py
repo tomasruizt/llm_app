@@ -1,3 +1,4 @@
+from .internvl import InternVL
 from .base_llm import LLM
 from .gemini.media_description import GeminiAPI
 from .gemma import PaliGemma2
@@ -15,6 +16,7 @@ def filled_model_registry() -> ModelRegistry:
             ModelEntry.from_cls_with_id(MiniCPM),
             ModelEntry.from_cls_with_id(LLama3Vision8B),
             ModelEntry.from_cls_with_id(PaliGemma2),
+            ModelEntry.from_cls_with_id(InternVL),
             *model_entries_from_mult_ids(OpenAIModel),
             *model_entries_from_mult_ids(GeminiAPI),
         ]
