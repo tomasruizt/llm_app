@@ -55,6 +55,11 @@ if st.button("Restart chat"):
     st.session_state.messages1 = []  # list[Message]
     st.session_state.messages2 = []  # list[Message]
 
+model_bundler: Bundler = create_model_bundler()
+if st.button("Clear GPU"):
+    model_bundler.clear_model_on_gpu()
+    st.toast("GPU cleared", icon="✅")
+
 
 def render_messages(msgs: list[Message]) -> None:
     for msg in msgs:
@@ -80,8 +85,6 @@ def render_video(msg: Message):
         st.video(msg.video)
 
 
-n_cols = 1
-cs = st.columns(n_cols)
 render_messages(st.session_state.messages1)
 
 prompt = st.chat_input("Type here")
@@ -112,8 +115,6 @@ if media_file is not None:
 
 st.session_state.messages1.append(msg)
 render_message(msg)
-
-model_bundler: Bundler = create_model_bundler()
 
 with st.spinner("Initializing model..."):
     model_bundler.set_model_on_gpu(model_id=model1_id)
