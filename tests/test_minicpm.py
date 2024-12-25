@@ -21,6 +21,7 @@ def test_minicpm_vision():
     assert_model_recognizes_afd_in_video(model)
 
 
+@pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
 def test_internvl():
     model = InternVL()
     assert_model_knows_capital_of_france(model)
@@ -28,6 +29,7 @@ def test_internvl():
     assert_model_supports_multiturn(model)
 
 
+@pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
 def test_apollo_7b():
     model = Apollo7B()
     assert_model_recognizes_afd_in_video(model)
