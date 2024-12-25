@@ -7,6 +7,7 @@ x-common-gpu: &common-gpu
     - HF_TOKEN=${HF_TOKEN}
     - LLMS_REST_API_KEY=${LLMS_REST_API_KEY}
     - BUGSNAG_API_KEY=${BUGSNAG_API_KEY}
+    - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
   deploy:
     resources:
       reservations:

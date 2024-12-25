@@ -1,6 +1,7 @@
 from io import BytesIO
 from llmlib.internvl import InternVL
 from llmlib.minicpm import MiniCPM, to_listof_imgs
+from llmlib.replicate_api import Apollo7B
 import pytest
 from .helpers import (
     assert_model_knows_capital_of_france,
@@ -25,6 +26,11 @@ def test_internvl():
     assert_model_knows_capital_of_france(model)
     assert_model_recognizes_pyramid_in_image(model)
     assert_model_supports_multiturn(model)
+
+
+def test_apollo_7b():
+    model = Apollo7B()
+    assert_model_recognizes_afd_in_video(model)
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="video.mp4 does not exist in CI")

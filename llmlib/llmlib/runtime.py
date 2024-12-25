@@ -1,3 +1,4 @@
+from .replicate_api import Apollo7B
 from .internvl import InternVL
 from .base_llm import LLM
 from .gemini.media_description import GeminiAPI
@@ -13,6 +14,7 @@ def filled_model_registry() -> ModelRegistry:
     return ModelRegistry(
         models=[
             ModelEntry.from_cls_with_id(InternVL),
+            ModelEntry.from_cls_with_id(Apollo7B),
             ModelEntry.from_cls_with_id(MiniCPM),
             ModelEntry.from_cls_with_id(Phi3Vision),
             ModelEntry.from_cls_with_id(LLama3Vision8B),
