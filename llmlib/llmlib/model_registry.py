@@ -9,11 +9,18 @@ class ModelEntry:
     model_id: str
     clazz: type[LLM]
     ctor: Callable[[], LLM]
-    warnings: list[str] = field(default_factory=list)
+    warnings: list[str]
+    infos: list[str]
 
     @classmethod
     def from_cls_with_id(cls, T: type[LLM]) -> Self:
-        return cls(model_id=T.model_id, clazz=T, ctor=T, warnings=T.get_warnings())
+        return cls(
+            model_id=T.model_id,
+            clazz=T,
+            ctor=T,
+            warnings=T.get_warnings(),
+            infos=T.get_info(),
+        )
 
 
 @dataclass

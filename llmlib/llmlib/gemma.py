@@ -41,7 +41,14 @@ class PaliGemma2(LLM):
     @classmethod
     def get_warnings(cls) -> list[str]:
         return [
-            "This model only accepts one message by the user at a time.",
-            "This model REQUIRES an image.",
-            "PaliGemma2 is only pretrained and might not follow instructions well.",
+            "This model only accepts one message by the user at a time. Restart the chat after every interaction.",
+            "This model REQUIRES an image. Video support is not implemented yet.",
+        ]
+
+    @classmethod
+    def get_info(cls) -> list[str]:
+        return [
+            "Link to HuggingFace: [PaliGemma2](https://huggingface.co/google/paligemma-3b-pt-896)",
+            "This model requires a specific syntax for prompts: [examples here](https://ai.google.dev/gemma/docs/paligemma/prompt-system-instructions#prompt_task_syntax)",
+            "The authors recommend fine-tuning this model on your own data, because its ability to follow instructions is limited.",
         ]

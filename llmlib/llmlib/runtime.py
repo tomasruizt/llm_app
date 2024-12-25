@@ -33,6 +33,7 @@ def model_entries_from_mult_ids(cls: type[LLM]) -> list[ModelEntry]:
             clazz=cls,
             ctor=lambda: cls(model_id=id_),
             warnings=cls.get_warnings(),
+            infos=cls.get_info(),
         )
         for id_ in cls.model_ids
     ]

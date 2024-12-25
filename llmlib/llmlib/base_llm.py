@@ -42,3 +42,7 @@ class LLM:
     @classmethod
     def get_warnings(cls) -> list[str]:
         return []
+
+    @classmethod
+    def get_info(cls) -> list[str]:
+        return []
