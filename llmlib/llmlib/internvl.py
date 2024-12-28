@@ -19,3 +19,11 @@ class InternVL(LLM):
                 imgs.append(msg.img)
             session = self.pipe.chat((msg.msg, imgs), session=session)
         return session.response.text
+
+    @staticmethod
+    def get_info() -> list[str]:
+        return [
+            "Model: InternVL 2.5 8B by OpenGVLab (Shanghai AI Laboratory), HuggingFace link: [here](https://huggingface.co/OpenGVLab/InternVL2_5-8B-AWQ)",
+            "This model supports images and multi-turn conversations.",
+            "This model is quantized to 4-bit precision using AWQ.",
+        ]
