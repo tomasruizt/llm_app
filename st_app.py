@@ -3,11 +3,18 @@ import logging
 from PIL import Image
 import streamlit as st
 from llmlib.runtime import filled_model_registry
-from llmlib.model_registry import ModelEntry, ModelRegistry
+from llmlib.model_registry import ModelRegistry
 from llmlib.base_llm import Message
 from llmlib.bundler import Bundler
 from llmlib.bundler_request import BundlerRequest
-from st_helpers import is_image, is_video
+from st_helpers import (
+    create_model_bundler,
+    display_warnings,
+    is_image,
+    is_video,
+    render_message,
+    render_messages,
+)
 from login_mask_simple import check_password
 
 fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -22,21 +29,6 @@ st.title("LLM App")
 
 
 model_registry: ModelRegistry = filled_model_registry()
-
-
-@st.cache_resource()
-def create_model_bundler() -> Bundler:
-    return Bundler(registry=model_registry)
-
-
-def display_warnings(r: ModelRegistry, model_id: str) -> None:
-    e1: ModelEntry = r.get_entry(model_id)
-    if len(e1.infos) > 0:
-        txt = ["* " + e for e in e1.infos]
-        st.info("\n".join(txt))
-    if len(e1.warnings) > 0:
-        txt = ["* " + e for e in e1.warnings]
-        st.warning("\n".join(txt))
 
 
 cs = st.columns(2)
@@ -62,30 +54,6 @@ model_bundler: Bundler = create_model_bundler()
 if st.button("Clear GPU"):
     model_bundler.clear_model_on_gpu()
     st.toast("GPU cleared", icon="✅")
-
-
-def render_messages(msgs: list[Message]) -> None:
-    for msg in msgs:
-        render_message(msg)
-
-
-def render_message(msg: Message):
-    with st.chat_message(msg.role):
-        if msg.has_image():
-            render_img(msg)
-        if msg.has_video():
-            render_video(msg)
-        st.markdown(msg.msg)
-
-
-def render_img(msg: Message):
-    st.image(msg.img, caption=msg.img_name, width=400)
-
-
-def render_video(msg: Message):
-    cs = st.columns([1, 4])
-    with cs[0]:
-        st.video(msg.video)
 
 
 render_messages(st.session_state.messages1)
