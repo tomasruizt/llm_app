@@ -15,11 +15,10 @@ class Msg(TypedDict):
 
 
 class Apollo7B(LLM):
-    model_id = "replicate/lucataco/apollo-7b"
+    model_id = "replicate/tomasruizt/apollo-7b-multiturn"
     model_id_full = "tomasruizt/apollo-7b-multiturn:1120d3a705916a77c094d3bfc180089f6a4e46f840218bd1663b00b889da2951"
 
     def video_prompt(self, video: Path | BytesIO, prompt: str) -> str:
-        logger.info("Calling Replicate API with model %s", self.model_id)
         messages = [{"role": "user", "content": prompt}]
         return self.call_api(video=video, messages=messages)
 
@@ -31,6 +30,7 @@ class Apollo7B(LLM):
         return self.call_api(video=fst_msg.video, messages=messages)
 
     def call_api(self, video: Path | BytesIO, messages: list[Msg]) -> str:
+        logger.info("Calling Replicate API with model %s", self.model_id)
         output = replicate.run(
             self.model_id_full,
             input={
@@ -44,8 +44,8 @@ class Apollo7B(LLM):
         return output
 
     @classmethod
-    def get_warnings(cls) -> list[str]:
+    def get_info(cls) -> list[str]:
         return [
-            "This model only supports single-turn video chat.",
-            "This model is run using the paid Replicate API ([see link](https://replicate.com/lucataco/apollo-7b)). The first call to it might take 30s while the model warms up.",
+            "This model REQUIRES a single video in the first user message. It cannot handle images.",
+            "This model runs on the paid Replicate API ([see link](https://replicate.com/tomasruizt/apollo-7b-multiturn)). The first call to it might take 30s while the model warms up.",
         ]
