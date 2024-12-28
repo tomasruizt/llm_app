@@ -44,11 +44,9 @@ with cs[1]:
 
 if "messages1" not in st.session_state:
     st.session_state.messages1 = []  # list[Message]
-    st.session_state.messages2 = []  # list[Message]
 
 if st.button("Restart chat"):
     st.session_state.messages1 = []  # list[Message]
-    st.session_state.messages2 = []  # list[Message]
 
 model_bundler: Bundler = create_model_bundler()
 if st.button("Clear GPU"):
