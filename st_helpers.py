@@ -1,3 +1,4 @@
+import subprocess
 from llmlib.base_llm import Message
 from llmlib.model_registry import ModelEntry, ModelRegistry
 
@@ -52,3 +53,16 @@ def render_message(msg: Message):
 def render_messages(msgs: list[Message]) -> None:
     for msg in msgs:
         render_message(msg)
+
+
+def render_gpu_consumption() -> None:
+    output = subprocess.run(
+        "nvidia-smi --query-gpu=memory.used --format=csv",
+        shell=True,
+        capture_output=True,
+        text=True,
+    )
+    memory_used_mb = int(output.stdout.split("\n")[1].replace(" MiB", ""))
+    memory_used_gb = memory_used_mb / 1024
+    st.metric("Used GPU Memory", f"{memory_used_gb:.2f} GB", delta_color="normal")
+    st.button("Update Display")

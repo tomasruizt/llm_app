@@ -14,6 +14,7 @@ from st_helpers import (
     is_video,
     render_message,
     render_messages,
+    render_gpu_consumption,
 )
 from login_mask_simple import check_password
 
@@ -29,9 +30,9 @@ st.title("LLM App")
 
 
 model_registry: ModelRegistry = filled_model_registry()
+model_bundler: Bundler = create_model_bundler()
 
-
-cs = st.columns(2)
+cs = st.columns([2, 1, 1])
 with cs[0]:
     model1_id: str = st.selectbox("Select model", model_registry.all_model_ids())
     display_warnings(model_registry, model1_id)
@@ -48,13 +49,13 @@ if "messages1" not in st.session_state:
 if st.button("Restart chat"):
     st.session_state.messages1 = []  # list[Message]
 
-model_bundler: Bundler = create_model_bundler()
-if st.button("Clear GPU"):
-    model_bundler.clear_model_on_gpu()
-    st.toast("GPU cleared", icon="✅")
-
 
 render_messages(st.session_state.messages1)
+
+with cs[2]:
+    render_gpu_consumption()
+    if st.button("Clear GPU", help="Some memory might not be freed despite this..."):
+        model_bundler.clear_model_on_gpu()
 
 prompt = st.chat_input("Type here")
 if prompt is None:

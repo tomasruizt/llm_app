@@ -4,6 +4,7 @@ from lmdeploy import pipeline, VisionConfig
 
 class InternVL(LLM):
     model_id = "OpenGVLab/InternVL2_5-8B-AWQ"
+    requires_gpu_exclusively = True
 
     def __init__(self):
         self.pipe = pipeline(
