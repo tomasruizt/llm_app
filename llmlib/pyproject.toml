@@ -11,7 +11,8 @@ bugsnag = "^4.7.1"
 decord = "^0.6.0"
 google-cloud-aiplatform = "^1.64"
 decorator = "^5.1.1"
-lmdeploy = "^0.6.4"
+lmdeploy = "^0.6.4"  # for internvl2.5
+timm = "^1.0.12"  # for internvl2.5
 replicate = "^1.0.4"
 transformers = "^4.47.1"
 
