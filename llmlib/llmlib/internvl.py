@@ -12,7 +12,7 @@ class InternVL(LLM):
             vision_config=VisionConfig(thread_safe=True),
         )
 
-    def complete_msgs2(self, msgs: list[Message]) -> str:
+    def complete_msgs(self, msgs: list[Message]) -> str:
         session = None
         for msg in msgs:
             imgs = []

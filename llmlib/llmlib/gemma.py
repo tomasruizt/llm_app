@@ -14,7 +14,7 @@ class PaliGemma2(LLM):
         ).eval()
         self.processor = PaliGemmaProcessor.from_pretrained(self.model_id)
 
-    def complete_msgs2(self, msgs: list[Message]) -> str:
+    def complete_msgs(self, msgs: list[Message]) -> str:
         if len(msgs) != 1:
             raise ValueError("Currently, Gemma2 only supports one message at a time")
 

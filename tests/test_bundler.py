@@ -17,7 +17,7 @@ def test_get_response():
     b = Bundler(filled_model_registry())
     msgs = [Message(role="user", msg="hello")]
     request = BundlerRequest(model_id=GpuLLM.model_id, msgs=msgs)
-    expected_response = GpuLLM().complete_msgs2(msgs)
+    expected_response = GpuLLM().complete_msgs(msgs)
     actual_response: str = b.get_response(request)
     assert actual_response == expected_response
     assert b.id_of_model_on_gpu() == GpuLLM.model_id
@@ -28,7 +28,7 @@ def test_bundler_multiple_responses():
     models = [GpuLLM(), GpuLLM2(), NonGpuLLM()]
     msgs = [Message(role="user", msg="hello")]
 
-    expected_responses = [m.complete_msgs2(msgs) for m in models]
+    expected_responses = [m.complete_msgs(msgs) for m in models]
     assert expected_responses[0] != expected_responses[1]
 
     actual_responses = [
@@ -68,7 +68,7 @@ class GpuLLM(LLM):
     model_id = "gpu-llm-model"
     requires_gpu_exclusively = True
 
-    def complete_msgs2(self, msgs: list[Message]) -> str:
+    def complete_msgs(self, msgs: list[Message]) -> str:
         return "gpu msg"
 
 
@@ -77,7 +77,7 @@ class GpuLLM2(LLM):
     model_id = "gpu-llm-model-2"
     requires_gpu_exclusively = True
 
-    def complete_msgs2(self, msgs: list[Message]) -> str:
+    def complete_msgs(self, msgs: list[Message]) -> str:
         return "gpu msg 2"
 
 
@@ -86,5 +86,5 @@ class NonGpuLLM(LLM):
     model_id = "non-gpu-llm-model"
     requires_gpu_exclusively = False
 
-    def complete_msgs2(self, msgs: list[Message]) -> str:
+    def complete_msgs(self, msgs: list[Message]) -> str:
         return "non-gpu message"

@@ -180,7 +180,7 @@ class GeminiAPI(LLM):
     requires_gpu_exclusively = False
     model_ids = [Models.gemini_pro, Models.gemini_flash]
 
-    def complete_msgs2(self, msgs: list[Message]) -> str:
+    def complete_msgs(self, msgs: list[Message]) -> str:
         if len(msgs) != 1:
             raise ValueError("GeminiAPI only supports one message")
 

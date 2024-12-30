@@ -22,7 +22,7 @@ class Apollo7B(LLM):
         messages = [{"role": "user", "content": prompt}]
         return self.call_api(video=video, messages=messages)
 
-    def complete_msgs2(self, msgs: list[Message]) -> str:
+    def complete_msgs(self, msgs: list[Message]) -> str:
         fst_msg = msgs[0]
         if not fst_msg.has_video():
             raise ValueError("Apollo7B only supports video input")

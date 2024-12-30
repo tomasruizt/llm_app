@@ -38,7 +38,7 @@ class Phi3Vision(LLM):
         msg = Message(role="user", msg=prompt)
         return completion(llm=self, batch=[[msg]])[0]
 
-    def complete_msgs2(self, msgs: list[Message]) -> str:
+    def complete_msgs(self, msgs: list[Message]) -> str:
         return completion(llm=self, batch=[msgs])[0]
 
     def complete_batch(self, batch: list[list[Message]]) -> list[str]:

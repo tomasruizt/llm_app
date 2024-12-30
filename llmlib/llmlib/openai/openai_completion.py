@@ -1,5 +1,4 @@
 import os
-from PIL.Image import Image
 from ..base_llm import LLM, Message
 from ..rest_api.restapi_client import encode_as_png_in_base64
 from openai import OpenAI, ChatCompletion
@@ -19,17 +18,14 @@ class OpenAIModel(LLM):
     def complete(self, prompt: str) -> str:
         return complete(model=self.model, prompt=prompt)
 
-    def complete_msgs(self, messages: list[dict], images: list[Image] = []) -> str:
-        return complete_msgs(model=self.model, messages=messages)
-
     def complete_many(
         self, prompts: list[str], n_workers: int = os.cpu_count()
     ) -> list[str]:
         return complete_many(model=self.model, prompts=prompts, n_workers=n_workers)
 
-    def complete_msgs2(self, msgs: list[Message]) -> str:
+    def complete_msgs(self, msgs: list[Message]) -> str:
         messages: list[dict] = extract_msgs(msgs)
-        return self.complete_msgs(messages)
+        return complete_msgs(model=self.model, messages=messages)
 
 
 def complete_many(

@@ -30,7 +30,7 @@ class LLM:
     model_id: str
     requires_gpu_exclusively: bool = False
 
-    def complete_msgs2(self, msgs: list[Message]) -> str:
+    def complete_msgs(self, msgs: list[Message]) -> str:
         raise NotImplementedError
 
     def complete_batch(self, batch: list[list[Message]]) -> list[str]:

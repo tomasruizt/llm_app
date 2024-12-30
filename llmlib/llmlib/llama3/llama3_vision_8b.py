@@ -16,7 +16,7 @@ class LLama3Vision8B(LLM):
         self.model = create_model()
         self.tokenizer = create_tokenizer()
 
-    def complete_msgs2(self, msgs: list[Message]) -> str:
+    def complete_msgs(self, msgs: list[Message]) -> str:
         if len(msgs) != 1:
             raise ValueError(
                 f"model='{_model_id}' supports only one message by the user."

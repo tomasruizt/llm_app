@@ -6,7 +6,7 @@ import pytest
 
 
 def assert_model_knows_capital_of_france(model: LLM) -> None:
-    response: str = model.complete_msgs2(
+    response: str = model.complete_msgs(
         msgs=[Message(role="user", msg="What is the capital of France?")]
     )
     assert "paris" in response.lower()
@@ -51,7 +51,7 @@ def assert_model_rejects_unsupported_batches(model: LLM) -> None:
 
 def assert_model_recognizes_pyramid_in_image(model: LLM):
     msg = pyramid_message()
-    answer: str = model.complete_msgs2(msgs=[msg])
+    answer: str = model.complete_msgs(msgs=[msg])
     assert "pyramid" in answer.lower()
 
 
@@ -64,7 +64,7 @@ def assert_model_recognizes_afd_in_video(model: LLM):
 
 def get_mona_lisa_completion(model: LLM) -> str:
     msg: Message = mona_lisa_message()
-    answer: str = model.complete_msgs2(msgs=[msg])
+    answer: str = model.complete_msgs(msgs=[msg])
     return answer
 
 
@@ -126,5 +126,5 @@ def is_ci() -> bool:
 def assert_model_supports_multiturn(model: LLM):
     msg1 = Message.from_prompt("My name is Tomas")
     msg2 = Message.from_prompt("What is my name?")
-    answer = model.complete_msgs2([msg1, msg2])
+    answer = model.complete_msgs([msg1, msg2])
     assert "Tomas" in answer

@@ -34,7 +34,7 @@ def test_gemini_vision():
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
-def test_gemini_vision_with_gemma():
+def test_gemini_vision_using_interface():
     model = GeminiAPI(model_id=Models.gemini_flash, max_output_tokens=50)
     assert_model_knows_capital_of_france(model)
     assert_model_recognizes_pyramid_in_image(model)

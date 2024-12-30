@@ -28,9 +28,9 @@ class MiniCPM(LLM):
         self.temperature = temperature
 
     def chat(self, prompt: str) -> str:
-        return self.complete_msgs2([Message(role="user", msg=prompt)])
+        return self.complete_msgs([Message(role="user", msg=prompt)])
 
-    def complete_msgs2(self, msgs: list[Message]) -> str:
+    def complete_msgs(self, msgs: list[Message]) -> str:
         dict_msgs = [_convert_msg_to_dict(m) for m in msgs]
         use_sampling = self.temperature > 0.0
         res = self.model.chat(

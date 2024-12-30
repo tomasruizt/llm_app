@@ -30,7 +30,7 @@ class Bundler:
             if len(req.msgs) > 1:
                 raise ValueError("Video only supported for single message requests")
             return model.video_prompt(last_msg.video, last_msg.msg)
-        return model.complete_msgs2(req.msgs)
+        return model.complete_msgs(req.msgs)
 
     def _get_model_instance(self, e: ModelEntry) -> LLM:
         if e.clazz.requires_gpu_exclusively:
