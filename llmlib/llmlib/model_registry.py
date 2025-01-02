@@ -1,6 +1,6 @@
 from typing_extensions import Self
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Any
 from .base_llm import LLM
 
 
@@ -8,7 +8,7 @@ from .base_llm import LLM
 class ModelEntry:
     model_id: str
     clazz: type[LLM]
-    ctor: Callable[[], LLM]
+    ctor_kwargs: dict[str, Any]
     warnings: list[str]
     infos: list[str]
 
@@ -17,10 +17,13 @@ class ModelEntry:
         return cls(
             model_id=T.model_id,
             clazz=T,
-            ctor=T,
+            ctor_kwargs={},
             warnings=T.get_warnings(),
             infos=T.get_info(),
         )
+
+    def ctor(self) -> LLM:
+        return self.clazz(**self.ctor_kwargs)
 
 
 @dataclass
@@ -33,3 +36,18 @@ class ModelRegistry:
 
     def all_model_ids(self) -> list[str]:
         return [entry.model_id for entry in self.models]
+
+
+def model_entries_from_mult_ids(cls: type[LLM]) -> list[ModelEntry]:
+    assert hasattr(cls, "model_ids")
+    entries = [
+        ModelEntry(
+            model_id=id_,
+            clazz=cls,
+            ctor_kwargs={"model_id": id_},
+            warnings=cls.get_warnings(),
+            infos=cls.get_info(),
+        )
+        for id_ in cls.model_ids
+    ]
+    return entries
