@@ -15,7 +15,7 @@ from .helpers import (
 
 @pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
 def test_minicpm_vision():
-    model = MiniCPM()
+    model = MiniCPM(model_id="openbmb/MiniCPM-V-2_6-int4")
     assert_model_knows_capital_of_france(model)
     assert_model_recognizes_pyramid_in_image(model)
     assert_model_recognizes_afd_in_video(model)
