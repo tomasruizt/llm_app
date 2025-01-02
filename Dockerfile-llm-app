@@ -6,11 +6,13 @@ RUN apt-get update
 RUN apt-get install -y build-essential
 RUN apt-get install -y git
 
+RUN pip install uv
 COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
+RUN uv pip install -r requirements.txt --system
+RUN pip install flash-attn --no-build-isolation
 COPY *.py ./
 ADD llmlib ./llmlib
-RUN pip install -e llmlib
+RUN uv pip install -e llmlib --system
 ADD .streamlit .streamlit
 
 #CMD [ "python", "--version"]

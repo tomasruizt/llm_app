@@ -7,5 +7,5 @@ torch
 streamlit
 bitsandbytes
 accelerate
-flash-attn
+# install manually: pip install flash-attn --no-build-isolation
 fastapi[standard]
