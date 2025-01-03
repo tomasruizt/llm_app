@@ -24,7 +24,7 @@ class PaliGemma2(LLM):
             raise ValueError("Gemma2 requires an image")
 
         inputs = (
-            self.processor(text=prompt, images=image, return_tensors="pt")
+            self.processor(text="<image> " + prompt, images=image, return_tensors="pt")
             .to(torch.bfloat16)
             .to(self.model.device)
         )
@@ -48,7 +48,7 @@ class PaliGemma2(LLM):
     @classmethod
     def get_info(cls) -> list[str]:
         return [
-            "Link to HuggingFace: [PaliGemma2](https://huggingface.co/google/paligemma-3b-pt-896)",
+            "Link to HuggingFace: [PaliGemma2 By Google](https://huggingface.co/google/paligemma-3b-pt-896)",
             "This model requires a specific syntax for prompts: [examples here](https://ai.google.dev/gemma/docs/paligemma/prompt-system-instructions#prompt_task_syntax)",
-            "The authors recommend fine-tuning this model on your own data, because its ability to follow instructions is limited.",
+            "This model was pretrained only. The authors recommend fine-tuning it on your own data, because its ability to follow instructions is limited.",
         ]
