@@ -46,9 +46,14 @@ with cs[1]:
 if "messages1" not in st.session_state:
     st.session_state.messages1 = []  # list[Message]
 
-if st.button("Restart chat"):
-    st.session_state.messages1 = []  # list[Message]
 
+col1, col2, *_ = st.columns([1, 1, 4])
+with col1:
+    if st.button("Restart chat"):
+        st.session_state.messages1 = []  # list[Message]
+with col2:
+    if st.button("Keep only 1st message"):
+        st.session_state.messages1 = st.session_state.messages1[:1]
 
 render_messages(st.session_state.messages1)
 
