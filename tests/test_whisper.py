@@ -1,6 +1,7 @@
-from llmlib.whisper import Whisper
+from llmlib.whisper import Whisper, WhisperOutput
 import pytest
 from tests.helpers import is_ci, file_for_test
+import json
 
 
 @pytest.fixture(scope="module")
@@ -22,8 +23,17 @@ def test_video_transcription(model: Whisper):
     expected_fragment = (
         "Die Unionsparteien oder deren Politiker sind heute wichtige Offiziere"
     )
-    transcription = model.transcribe_file(video_file)
+    transcription: str = model.transcribe_file(video_file)
     assert expected_fragment in transcription
+
+
+@pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
+def test_video_transcription_with_timestamps(model: Whisper, snapshot):
+    video_file = str(file_for_test("video.mp4"))
+    output: WhisperOutput = model.run_pipe(
+        video_file, translate=False, return_timestamps=True
+    )
+    snapshot.assert_match(json.dumps(output, indent=2), "transcription.json")
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
