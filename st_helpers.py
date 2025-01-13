@@ -1,10 +1,14 @@
+import os
 import subprocess
+import tempfile
 from llmlib.base_llm import Message
 from llmlib.model_registry import ModelEntry, ModelRegistry
 
 
 from llmlib.runtime import filled_model_registry
+from llmlib.whisper import Whisper, WhisperOutput
 import streamlit as st
+from streamlit.runtime.uploaded_file_manager import UploadedFile
 from llmlib.bundler import Bundler
 
 
@@ -19,6 +23,27 @@ def is_image(media_file) -> bool:
 @st.cache_resource()
 def create_model_bundler() -> Bundler:
     return Bundler(registry=filled_model_registry())
+
+
+@st.cache_resource(show_spinner="Initializing transcription model (Whisper)...")
+def create_whisper() -> Whisper:
+    return Whisper()
+
+
+@st.cache_data(show_spinner="Transcribing video...")
+def transcribe_video(media_file: UploadedFile) -> WhisperOutput:
+    media_file_extension = "." + media_file.name.split(".")[-1]
+    with tempfile.NamedTemporaryFile(
+        mode="wb", suffix=media_file_extension, delete=False
+    ) as f:
+        f.write(media_file.read())
+        f.flush()
+        filename = f.name
+    media_file.seek(0)
+    whisper = create_whisper()
+    output = whisper.run_pipe(filename, translate=False, return_timestamps=True)
+    os.remove(filename)
+    return output
 
 
 def display_warnings(r: ModelRegistry, model_id: str) -> None:

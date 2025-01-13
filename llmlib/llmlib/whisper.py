@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import json
 from logging import getLogger
 from typing import Any, TypedDict
 import warnings
@@ -91,3 +92,16 @@ class Whisper:
 
 def text(data: WhisperOutput) -> str:
     return data["text"].strip()
+
+
+def merge_prompt_with_transcription(prompt: str, data: WhisperOutput) -> str:
+    pretty_json = json.dumps(data["chunks"], indent=2, ensure_ascii=False)
+    merged: str = f"""{prompt}
+
+Additional context:
+The following is the chunked transcription by the Whisper model:
+```json
+{pretty_json}
+```
+"""
+    return merged

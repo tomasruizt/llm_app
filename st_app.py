@@ -1,6 +1,7 @@
 from io import BytesIO
 import logging
 from PIL import Image
+from llmlib.whisper import WhisperOutput, merge_prompt_with_transcription
 import streamlit as st
 from llmlib.runtime import filled_model_registry
 from llmlib.model_registry import ModelRegistry
@@ -9,12 +10,14 @@ from llmlib.bundler import Bundler
 from llmlib.bundler_request import BundlerRequest
 from st_helpers import (
     create_model_bundler,
+    create_whisper,
     display_warnings,
     is_image,
     is_video,
     render_message,
     render_messages,
     render_gpu_consumption,
+    transcribe_video,
 )
 from login_mask_simple import check_password
 
@@ -47,13 +50,18 @@ if "messages1" not in st.session_state:
     st.session_state.messages1 = []  # list[Message]
 
 
-col1, col2, *_ = st.columns([1, 1, 4])
+col1, col2, _ = st.columns([1, 1, 3])
 with col1:
     if st.button("Restart chat"):
         st.session_state.messages1 = []  # list[Message]
 with col2:
-    if st.button("Keep only 1st message"):
-        st.session_state.messages1 = st.session_state.messages1[:1]
+    enabled = media_file is not None and is_video(media_file)
+    do_transcribe = st.checkbox(
+        "Transcribe",
+        value=False,
+        disabled=not enabled,
+        help="Use Whisper to add a video transcription to your prompt",
+    )
 
 render_messages(st.session_state.messages1)
 
@@ -65,6 +73,10 @@ with cs[2]:
 prompt = st.chat_input("Type here")
 if prompt is None:
     st.stop()
+
+if media_file is not None and do_transcribe:
+    data: WhisperOutput = transcribe_video(media_file=media_file)
+    prompt: str = merge_prompt_with_transcription(prompt, data)
 
 
 if media_file is None:
@@ -92,6 +104,7 @@ st.session_state.messages1.append(msg)
 render_message(msg)
 
 with st.spinner("Initializing model..."):
+    create_whisper.clear()
     model_bundler.set_model_on_gpu(model_id=model1_id)
 
 with st.spinner("Generating response..."):
