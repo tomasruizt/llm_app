@@ -14,6 +14,7 @@ import proto
 from vertexai.generative_models import (
     GenerativeModel,
     Part,
+    Content,
     HarmCategory,
     HarmBlockThreshold,
     GenerationResponse,
@@ -54,32 +55,73 @@ available_models = [
 
 
 @dataclass
-class Request:
+class SingleTurnRequest:
     media_files: list[Path]
     model_name: GeminiModels = GeminiModels.gemini_15_pro
     prompt: str = "Describe this video in detail."
     max_output_tokens: int = 1000
     safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
+    delete_files_after_use: bool = True
 
     def fetch_media_description(self) -> str:
-        return fetch_media_description(self)
+        return _execute_single_turn_req(self)
+
+
+@dataclass
+class MultiTurnRequest:
+    messages: list[Message]
+    model_name: GeminiModels = GeminiModels.gemini_15_pro
+    max_output_tokens: int = 1000
+    safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
+    delete_files_after_use: bool = True
+
+    def fetch_media_description(self) -> str:
+        return _execute_multi_turn_req(self)
 
 
 @notify_bugsnag
-def fetch_media_description(req: Request) -> str:
-    # TODO: Always delete the video in the end. Perhaps use finally block.
+def _execute_single_turn_req(req: SingleTurnRequest) -> str:
     blobs = upload_files(files=req.media_files)
+    contents = [*blobs_to_parts(blobs), req.prompt]
+    response: GenerationResponse = _call_gemini(req, contents)
+    if req.delete_files_after_use:
+        delete_blobs(blobs)
+    return response.text
 
+
+@notify_bugsnag
+def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
+    # only the first message can have file(s)
+    for msg in req.messages[1:]:
+        if msg.has_image() or msg.has_video():
+            raise ValueError("Only the first message can have file(s)")
+    all_blobs = []
+    contents = []
+    for msg in req.messages:
+        content, blobs = convert_to_gemini_format(msg)
+        contents.append(content)
+        all_blobs.extend(blobs)
+    response: GenerationResponse = _call_gemini(req, contents)
+    if req.delete_files_after_use:
+        delete_blobs(all_blobs)
+    return response.text
+
+
+def convert_to_gemini_format(msg: Message) -> tuple[Content, list[storage.Blob]]:
+    role_map = dict(user="user", assistant="model")
+    role = role_map[msg.role]
+    paths = dump_files_return_paths(msg=msg)
+    blobs = upload_files(files=paths)
+    parts = [*blobs_to_parts(blobs), Part.from_text(text=msg.msg)]
+    return Content(role=role, parts=parts), blobs
+
+
+def _call_gemini(
+    req: SingleTurnRequest | MultiTurnRequest, contents: list[Part]
+) -> GenerationResponse:
     init_vertex()
     model = GenerativeModel(req.model_name)
-
-    prompt = req.prompt
     logger.info("Calling the Google API. model_name='%s'", req.model_name)
-    contents = [
-        Part.from_uri(storage_uri(Buckets.temp, b.name), mime_type=mime_type(b.name))
-        for b in blobs
-    ]
-    contents.append(prompt)
     response: GenerationResponse = model.generate_content(
         contents=contents,
         generation_config={
@@ -99,11 +141,22 @@ def fetch_media_description(req: Request) -> str:
     if response.candidates[0].finish_reason in {enum.SAFETY, enum.PROHIBITED_CONTENT}:
         raise UnsafeResponseError(safety_ratings=response.candidates[0].safety_ratings)
 
+    return response
+
+
+def blobs_to_parts(blobs: list[storage.Blob]) -> list[Part]:
+    return [
+        Part.from_uri(storage_uri(Buckets.temp, b.name), mime_type=mime_type(b.name))
+        for b in blobs
+    ]
+
+
+def delete_blobs(blobs: list[storage.Blob]) -> None:
+    if len(blobs) == 0:
+        return
     for blob in blobs:
         blob.delete()
     logger.info("Deleted %d blob(s)", len(blobs))
-
-    return response.text
 
 
 def init_vertex() -> None:
@@ -126,6 +179,8 @@ def mime_type(file_name: str) -> str:
 
 
 def upload_files(files: list[Path]) -> list[storage.Blob]:
+    if len(files) == 0:
+        return []
     logger.info("Uploading %d file(s)", len(files))
     bucket = _bucket(name=Buckets.temp)
     files_str = [str(f) for f in files]
@@ -189,21 +244,14 @@ class GeminiAPI(LLM):
     model_ids = available_models
 
     def complete_msgs(self, msgs: list[Message]) -> str:
-        if len(msgs) != 1:
-            raise ValueError("GeminiAPI only supports one message")
-
-        msg = msgs[0]
-        paths: list[Path] = []
-        if msg.has_image():
-            temp_file = tempfile.mktemp(suffix=".jpg")
-            msg.img.save(temp_file)
-            paths.append(Path(temp_file))
-        if msg.has_video():
-            temp_file = tempfile.mktemp(suffix=".mp4")
-            msg.video.save(temp_file)
-            paths.append(Path(temp_file))
-
-        req = Request(model_name=self.model_id, media_files=paths, prompt=msg.msg)
+        if len(msgs) == 1:
+            msg = msgs[0]
+            paths = dump_files_return_paths(msg)
+            req = SingleTurnRequest(
+                model_name=self.model_id, media_files=paths, prompt=msg.msg
+            )
+        else:
+            req = MultiTurnRequest(model_name=self.model_id, messages=msgs)
         return req.fetch_media_description()
 
     @singledispatchmethod
@@ -212,7 +260,9 @@ class GeminiAPI(LLM):
 
     @video_prompt.register
     def _(self, video: Path, prompt: str) -> str:
-        req = Request(model_name=self.model_id, media_files=[video], prompt=prompt)
+        req = SingleTurnRequest(
+            model_name=self.model_id, media_files=[video], prompt=prompt
+        )
         return req.fetch_media_description()
 
     @video_prompt.register
@@ -227,3 +277,17 @@ class GeminiAPI(LLM):
         return [
             "While Gemini supports multi-turn, and multi-file chat, we have only implemented single-file and single-turn prompts atm."
         ]
+
+
+def dump_files_return_paths(msg: Message) -> list[Path]:
+    """Can return 0, 1 or 2 paths"""
+    paths: list[Path] = []
+    if msg.has_image():
+        temp_file = tempfile.mktemp(suffix=".jpg")
+        msg.img.save(temp_file)
+        paths.append(Path(temp_file))
+    if msg.has_video():
+        temp_file = tempfile.mktemp(suffix=".mp4")
+        msg.video.save(temp_file)
+        paths.append(Path(temp_file))
+    return paths

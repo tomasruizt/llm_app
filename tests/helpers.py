@@ -128,3 +128,13 @@ def assert_model_supports_multiturn(model: LLM):
     msg2 = Message.from_prompt("What is my name?")
     answer = model.complete_msgs([msg1, msg2])
     assert "Tomas" in answer
+
+
+def assert_model_supports_multiturn_with_file(model: LLM):
+    q1_msg = pyramid_message()
+    a1_txt = model.complete_msgs([q1_msg])
+    assert "pyramid" in a1_txt.lower()
+    a1_msg = Message(role="assistant", msg=a1_txt)
+    q2_msg = Message(role="user", msg="What country is the picture in?")
+    a2_txt = model.complete_msgs([q1_msg, a1_msg, q2_msg])
+    assert "egypt" in a2_txt.lower()
