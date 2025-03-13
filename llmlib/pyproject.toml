@@ -1,26 +1,26 @@
-[tool.poetry]
+[project]
 name = "llmlib"
 version = "0.1.0"
 description = ""
-authors = ["Tomas Ruiz <tomas.ruiz.te@gmail.com>"]
+authors = [
+    {name = "Tomas Ruiz", email = "tomas.ruiz.te@gmail.com"}
+]
 readme = "README.md"
-
-[tool.poetry.dependencies]
-python = "^3.11"
-bugsnag = "^4.7.1"
-decord = "^0.6.0"
-google-cloud-aiplatform = "^1.64"
-decorator = "^5.1.1"
-lmdeploy = "^0.6.4"  # for internvl2.5
-timm = "^1.0.12"  # for internvl2.5
-replicate = "^1.0.4"
-transformers = "^4.47.1"
+requires-python = ">=3.11"
+dependencies = [
+    "bugsnag>=4.7.1",
+    "google-cloud-aiplatform>=1.64",
+    "decorator>=5.1.1",
+    "timm>=1.0.12",  # for internvl2.5
+    "replicate>=1.0.4",
+    "transformers>=4.47.1",
+]
 
 # I cannot add the dependencies below. I suspect that torch is a build-time dependency for flash-attn, or something like that.
-# accelerate = "^0.34.2"
-# flash-attn = "^2.6.3"
-# torch = "^2.4.0"
+# "accelerate>=0.34.2",
+# "flash-attn>=2.6.3",
+# "torch>=2.4.0",
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
