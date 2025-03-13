@@ -1,6 +1,6 @@
 from .replicate_api import Apollo7B
 from .internvl import InternVL
-from .gemini.media_description import GeminiAPI
+from .gemini.gemini_code import GeminiAPI
 from .gemma import PaliGemma2
 from .minicpm import MiniCPM
 from .llama3 import LLama3Vision8B

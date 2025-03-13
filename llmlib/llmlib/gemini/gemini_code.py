@@ -8,7 +8,6 @@ from io import BytesIO
 from logging import getLogger
 from pathlib import Path
 import tempfile
-from typing import Literal
 from google.cloud import storage
 from google.cloud.storage import transfer_manager
 import proto
@@ -19,6 +18,7 @@ from vertexai.generative_models import (
     HarmBlockThreshold,
     GenerationResponse,
 )
+from enum import StrEnum
 from ..base_llm import LLM, Message
 from ..error_handling import notify_bugsnag
 
@@ -27,7 +27,7 @@ import vertexai
 logger = getLogger(__name__)
 
 project_id = "css-lehrbereich"  # from google cloud console
-frankfurt = "europe-west3"  # https://cloud.google.com/about/locations#europe
+location = "europe-west1"  # https://cloud.google.com/about/locations#europe
 
 
 class Buckets:
@@ -40,18 +40,23 @@ def storage_uri(bucket: str, blob_name: str) -> str:
     return "gs://%s/%s" % (bucket, blob_name)
 
 
-class Models:
-    gemini_pro = "models/gemini-1.5-pro"
-    gemini_flash = "models/gemini-1.5-flash"
+class GeminiModels(StrEnum):
+    gemini_15_pro = "models/gemini-1.5-pro"
+    gemini_20_flash = "models/gemini-2.0-flash"
+    gemini_20_flash_lite = "models/gemini-2.0-flash-lite"
 
 
-available_models = [Models.gemini_pro, Models.gemini_flash]
+available_models = [
+    GeminiModels.gemini_15_pro,
+    GeminiModels.gemini_20_flash,
+    GeminiModels.gemini_20_flash_lite,
+]
 
 
 @dataclass
 class Request:
     media_files: list[Path]
-    model_name: Literal[Models.gemini_pro, Models.gemini_flash] = Models.gemini_pro
+    model_name: GeminiModels = GeminiModels.gemini_15_pro
     prompt: str = "Describe this video in detail."
     max_output_tokens: int = 1000
 
@@ -101,7 +106,7 @@ def fetch_media_description(req: Request) -> str:
 
 
 def init_vertex() -> None:
-    vertexai.init(project=project_id, location=frankfurt)
+    vertexai.init(project=project_id, location=location)
 
 
 def mime_type(file_name: str) -> str:
@@ -174,11 +179,11 @@ class ResponseRefusedException(Exception):
 
 @dataclass
 class GeminiAPI(LLM):
-    model_id: str = Models.gemini_pro
+    model_id: str = GeminiModels.gemini_20_flash_lite
     max_output_tokens: int = 1000
 
     requires_gpu_exclusively = False
-    model_ids = [Models.gemini_pro, Models.gemini_flash]
+    model_ids = available_models
 
     def complete_msgs(self, msgs: list[Message]) -> str:
         if len(msgs) != 1:

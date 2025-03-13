@@ -1,5 +1,5 @@
 from pathlib import Path
-from llmlib.gemini.media_description import GeminiAPI, Models, Request
+from llmlib.gemini.gemini_code import GeminiAPI, GeminiModels, Request
 import pytest
 
 from tests.helpers import (
@@ -23,7 +23,7 @@ def test_gemini_vision():
         assert path.exists()
 
     req = Request(
-        model_name=Models.gemini_flash,
+        model_name=GeminiModels.gemini_20_flash,
         media_files=files,
         prompt="Describe this combined images/audio/text in detail.",
     )
@@ -35,7 +35,7 @@ def test_gemini_vision():
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_gemini_vision_using_interface():
-    model = GeminiAPI(model_id=Models.gemini_flash, max_output_tokens=50)
+    model = GeminiAPI(model_id=GeminiModels.gemini_20_flash_lite, max_output_tokens=50)
     assert_model_knows_capital_of_france(model)
     assert_model_recognizes_pyramid_in_image(model)
     assert_model_recognizes_afd_in_video(model)
