@@ -11,7 +11,6 @@ dependencies = [
     "bugsnag>=4.7.1",
     "google-cloud-aiplatform>=1.64",
     "decorator>=5.1.1",
-    "timm>=1.0.12",  # for internvl2.5
     "replicate>=1.0.4",
     "transformers>=4.47.1",
 ]

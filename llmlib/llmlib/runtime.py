@@ -1,5 +1,4 @@
 from .replicate_api import Apollo7B
-from .internvl import InternVL
 from .gemini.gemini_code import GeminiAPI
 from .gemma import PaliGemma2
 from .minicpm import MiniCPM
@@ -13,7 +12,6 @@ def filled_model_registry() -> ModelRegistry:
     return ModelRegistry(
         models=[
             *model_entries_from_mult_ids(MiniCPM),
-            ModelEntry.from_cls_with_id(InternVL),
             ModelEntry.from_cls_with_id(Apollo7B),
             ModelEntry.from_cls_with_id(Phi3Vision),
             ModelEntry.from_cls_with_id(LLama3Vision8B),
