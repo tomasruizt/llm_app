@@ -59,6 +59,7 @@ class Request:
     model_name: GeminiModels = GeminiModels.gemini_15_pro
     prompt: str = "Describe this video in detail."
     max_output_tokens: int = 1000
+    safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
 
     def fetch_media_description(self) -> str:
         return fetch_media_description(self)
@@ -85,7 +86,7 @@ def fetch_media_description(req: Request) -> str:
             "temperature": 0.0,
             "max_output_tokens": req.max_output_tokens,
         },
-        safety_settings=block_nothing(),
+        safety_settings=safety_filter(req.safety_filter_threshold),
     )
     logger.info("Token usage: %s", proto.Message.to_dict(response.usage_metadata))
 
@@ -153,14 +154,16 @@ def upload_single_file(file: Path, bucket: str, blob_name: str) -> storage.Blob:
     return blob
 
 
-def block_nothing() -> dict[HarmCategory, HarmBlockThreshold]:
+def safety_filter(
+    threshold: HarmBlockThreshold,
+) -> dict[HarmCategory, HarmBlockThreshold]:
     return {
-        HarmCategory.HARM_CATEGORY_UNSPECIFIED: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_UNSPECIFIED: threshold,
+        HarmCategory.HARM_CATEGORY_HATE_SPEECH: threshold,
+        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: threshold,
+        HarmCategory.HARM_CATEGORY_HARASSMENT: threshold,
+        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: threshold,
+        HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY: threshold,
     }
 
 

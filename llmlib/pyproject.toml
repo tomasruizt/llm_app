@@ -13,6 +13,7 @@ dependencies = [
     "decorator>=5.1.1",
     "replicate>=1.0.4",
     "transformers>=4.47.1",
+    "pillow>=11.1.0",
 ]
 
 # I cannot add the dependencies below. I suspect that torch is a build-time dependency for flash-attn, or something like that.
