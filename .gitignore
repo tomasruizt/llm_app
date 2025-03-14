@@ -7,6 +7,9 @@ models/
 # C extensions
 *.so
 
+# MacOS
+.DS_Store
+
 # Distribution / packaging
 .Python
 build/

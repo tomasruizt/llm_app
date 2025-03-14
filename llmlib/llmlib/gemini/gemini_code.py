@@ -3,9 +3,9 @@ Based on https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/video-
 """
 
 from dataclasses import dataclass
-from datetime import datetime
 from functools import singledispatchmethod
 from io import BytesIO
+import json
 from logging import getLogger
 from pathlib import Path
 import tempfile
@@ -56,7 +56,7 @@ class GeminiModels(StrEnum):
 
     gemini_15_pro = "gemini-1.5-pro"
     gemini_15_flash = "gemini-1.5-flash-002"
-    gemini_20_flash = "gemini-2.0-flash"
+    gemini_20_flash = "gemini-2.0-flash-001"
     gemini_20_flash_lite = "gemini-2.0-flash-lite-001"
 
 
@@ -115,23 +115,29 @@ def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
             raise ValueError("Only the first message can have file(s)")
 
     # Prepare Inputs. Use context caching for media
-    paths = filepaths(msg=req.messages[0])
-    use_caching = req.use_context_caching and is_long_enough_to_cache(paths)
-    if use_caching:
-        cached_content, blobs = cache_content(req.model_name, tuple(paths))
-    else:
-        cached_content = None
-        blobs = upload_files(files=paths)
+    client = create_client()
     contents = [convert_to_gemini_format(msg) for msg in req.messages]
 
+    files: list[Path] = filepaths(msg=req.messages[0])
+    use_caching = req.use_context_caching and is_long_enough_to_cache(files)
+    if use_caching:
+        # Assume caching was done before
+        cached_content, success = get_cached_content(client, req.model_name, files)
+        blobs = []
+        if not success:
+            cached_content, blobs = cache_content(client, req.model_name, files)
+    else:  # Add files to the content
+        blobs = upload_files(files=files)
+        contents = [*blobs_to_parts(blobs), *contents]
+        cached_content = None
+
     # Call Gemini
-    client = create_client()
     response: GenerateContentResponse = _call_gemini(
         client, req, contents, cached_content
     )
 
     # Cleanup
-    if req.delete_files_after_use and not use_caching:
+    if req.delete_files_after_use:
         delete_blobs(blobs)
     return response.text
 
@@ -161,24 +167,35 @@ def video_duration_in_sec(filename: Path) -> float:
     return duration
 
 
-@ttl_cache(ttl=60 * 60)
 def cache_content(
-    model_id: str, paths: list[Path]
+    client: genai.Client, model_id: str, paths: list[Path], ttl: str = f"{60 * 20}s"
 ) -> tuple[CachedContent, list[storage.Blob]]:
     """Caches the content on Google as describe here: https://cloud.google.com/vertex-ai/generative-ai/docs/context-cache/context-cache-create"""
     logger.info("Caching content for paths: %s", paths)
-    client = create_client()
     blobs = upload_files(files=paths)
     parts = blobs_to_parts(blobs)
     content = Content(role="user", parts=parts)
-    cached_content = client.caches.create(
-        model=model_id,
-        config=CreateCachedContentConfig(
-            contents=[content],
-            display_name="multiturn cache for req at %s" % datetime.now(),
-        ),
+    config = CreateCachedContentConfig(
+        contents=[content], display_name=cache_id(model_id, paths), ttl=ttl
     )
+    cached_content = client.caches.create(model=model_id, config=config)
     return cached_content, blobs
+
+
+def cache_id(model_id: str, paths: list[Path]) -> str:
+    return json.dumps(dict(model=model_id, paths=str(paths)))
+
+
+def get_cached_content(
+    client: genai.Client, model_id: str, paths: list[Path]
+) -> tuple[CachedContent, bool]:
+    for cache in client.caches.list():
+        if cache.display_name == cache_id(model_id, paths):
+            logger.info(
+                "Found cached content for model_id='%s' and paths='%s'", model_id, paths
+            )
+            return cache, True
+    return None, False
 
 
 def convert_to_gemini_format(msg: Message) -> tuple[Content, list[storage.Blob]]:
@@ -324,6 +341,7 @@ class GeminiAPI(LLM):
     model_id: str = GeminiModels.gemini_20_flash_lite
     max_output_tokens: int = 1000
     use_context_caching: bool = False
+    delete_files_after_use: bool = True
 
     requires_gpu_exclusively = False
     model_ids = available_models
@@ -333,13 +351,23 @@ class GeminiAPI(LLM):
             msg = msgs[0]
             paths = filepaths(msg)
             req = SingleTurnRequest(
-                model_name=self.model_id, media_files=paths, prompt=msg.msg
+                model_name=self.model_id,
+                media_files=paths,
+                prompt=msg.msg,
+                max_output_tokens=self.max_output_tokens,
+                delete_files_after_use=self.delete_files_after_use,
             )
         else:
+            delete_files_after_use = self.delete_files_after_use
+            if self.use_context_caching:
+                delete_files_after_use = False
+
             req = MultiTurnRequest(
                 model_name=self.model_id,
                 messages=msgs,
                 use_context_caching=self.use_context_caching,
+                max_output_tokens=self.max_output_tokens,
+                delete_files_after_use=delete_files_after_use,
             )
         return req.fetch_media_description()
 
