@@ -148,11 +148,17 @@ def assert_model_supports_multiturn_with_6min_video(model: LLM):
     assert "jesus" in answer3.lower(), answer3
 
 
-def assert_model_supports_multiturn_with_picture(model: LLM):
-    q1_msg = pyramid_message()
-    a1_txt = model.complete_msgs([q1_msg])
-    assert "pyramid" in a1_txt.lower(), a1_txt
-    a1_msg = Message(role="assistant", msg=a1_txt)
-    q2_msg = Message(role="user", msg="What country is the picture in?")
-    a2_txt = model.complete_msgs([q1_msg, a1_msg, q2_msg])
-    assert "egypt" in a2_txt.lower(), a2_txt
+def assert_model_supports_multiturn_with_multiple_imgs(model: LLM):
+    files = [file_for_test("forest.jpg"), file_for_test("fish.jpg")]
+    msg = Message(
+        role="user", msg="Describe each image in one short sentence", files=files
+    )
+    convo = [msg]
+    answer1 = model.complete_msgs(convo).lower()
+    assert "forest" in answer1, answer1
+    assert "fish" in answer1, answer1
+
+    convo.append(Message(role="assistant", msg=answer1))
+    convo.append(Message(role="user", msg="How are they related?"))
+    answer2 = model.complete_msgs(convo).lower()
+    assert "biodiversity" in answer2, answer2

@@ -15,7 +15,7 @@ from tests.helpers import (
     assert_model_recognizes_pyramid_in_image,
     assert_model_supports_multiturn,
     assert_model_supports_multiturn_with_6min_video,
-    assert_model_supports_multiturn_with_picture,
+    assert_model_supports_multiturn_with_multiple_imgs,
     file_for_test,
     is_ci,
 )
@@ -37,18 +37,6 @@ def test_multiturn_textonly_conversation():
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 @pytest.mark.parametrize("use_context_caching", [False, True])
-def test_multiturn_conversation_with_img(use_context_caching: bool):
-    model = GeminiAPI(
-        model_id=GeminiModels.gemini_20_flash_lite,
-        max_output_tokens=50,
-        use_context_caching=use_context_caching,
-        delete_files_after_use=False,
-    )
-    assert_model_supports_multiturn_with_picture(model)
-
-
-@pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
-@pytest.mark.parametrize("use_context_caching", [False, True])
 def test_multiturn_conversation_with_6min_video_and_context_caching(
     use_context_caching: bool,
 ):
@@ -63,6 +51,18 @@ def test_multiturn_conversation_with_6min_video_and_context_caching(
         delete_files_after_use=False,
     )
     assert_model_supports_multiturn_with_6min_video(model)
+
+
+@pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
+@pytest.mark.parametrize("use_context_caching", [False, True])
+def test_gemini_multiturn_convo_with_multiple_imgs(use_context_caching: bool):
+    model = GeminiAPI(
+        model_id=GeminiModels.gemini_15_flash,
+        max_output_tokens=100,
+        use_context_caching=use_context_caching,
+        delete_files_after_use=False,
+    )
+    assert_model_supports_multiturn_with_multiple_imgs(model)
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")

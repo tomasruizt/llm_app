@@ -14,6 +14,7 @@ class Message:
     img_name: str | None = None
     img: Path | Image.Image | None = None
     video: Path | BytesIO | None = None
+    files: list[Path] | None = None
 
     @classmethod
     def from_prompt(cls, prompt: str) -> Self:

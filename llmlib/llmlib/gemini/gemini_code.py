@@ -78,7 +78,7 @@ class MultiTurnRequest:
 def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
     # Validation: Only the first message can have file(s)
     for msg in req.messages[1:]:
-        if msg.has_image() or msg.has_video():
+        if msg.has_image() or msg.has_video() or msg.files is not None:
             raise ValueError("Only the first message can have file(s)")
 
     # Prepare Inputs. Use context caching for media
@@ -364,6 +364,8 @@ def filepaths(msg: Message) -> list[Path]:
             paths.append(msg.video)
         else:
             raise PathNeededError()
+    if msg.files is not None:
+        paths.extend(msg.files)
     return paths
 
 
