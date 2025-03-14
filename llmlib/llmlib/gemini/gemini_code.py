@@ -8,7 +8,6 @@ from io import BytesIO
 import json
 from logging import getLogger
 from pathlib import Path
-import tempfile
 from typing import Any
 from google.cloud import storage
 from google.cloud.storage import transfer_manager
@@ -63,19 +62,6 @@ available_models = list(GeminiModels)
 
 
 @dataclass
-class SingleTurnRequest:
-    media_files: list[Path]
-    model_name: GeminiModels = GeminiModels.gemini_15_pro
-    prompt: str = "Describe this video in detail."
-    max_output_tokens: int = 1000
-    safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
-    delete_files_after_use: bool = True
-
-    def fetch_media_description(self) -> str:
-        return _execute_single_turn_req(self)
-
-
-@dataclass
 class MultiTurnRequest:
     messages: list[Message]
     model_name: GeminiModels = GeminiModels.gemini_15_pro
@@ -86,20 +72,6 @@ class MultiTurnRequest:
 
     def fetch_media_description(self) -> str:
         return _execute_multi_turn_req(self)
-
-
-@notify_bugsnag
-def _execute_single_turn_req(req: SingleTurnRequest) -> str:
-    # Prepare Inputs. Upload media files
-    blobs = upload_files(files=req.media_files)
-    contents = [*blobs_to_parts(blobs), req.prompt]
-    # Call Gemini
-    client = create_client()
-    response: GenerateContentResponse = _call_gemini(client, req, contents)
-    # Cleanup
-    if req.delete_files_after_use:
-        delete_blobs(blobs)
-    return response.text
 
 
 @notify_bugsnag
@@ -202,7 +174,7 @@ def convert_to_gemini_format(msg: Message) -> tuple[Content, list[storage.Blob]]
 
 def _call_gemini(
     client: genai.Client,
-    req: SingleTurnRequest | MultiTurnRequest,
+    req: MultiTurnRequest,
     contents: list[Part],
     cached_content: CachedContent | None = None,
 ) -> GenerateContentResponse:
@@ -276,8 +248,16 @@ def mime_type(file_name: str) -> str:
 def upload_files(files: list[Path]) -> list[storage.Blob]:
     if len(files) == 0:
         return []
-    logger.info("Uploading %d file(s)", len(files))
-    bucket = _bucket(name=Buckets.temp)
+    if len(files) <= 3:
+        blobs = [_upload_single_file(file, Buckets.temp) for file in files]
+    else:
+        blobs = _upload_batchof_files(files, bucket_name=Buckets.temp)
+    return blobs
+
+
+def _upload_batchof_files(files: list[Path], bucket_name: str) -> list[storage.Blob]:
+    logger.info("Uploading %d file(s) in batch to bucket '%s'", len(files), bucket_name)
+    bucket = _bucket(name=bucket_name)
     files_str = [str(f) for f in files]
     blobs = [bucket.blob(file.name) for file in files]
     transfer_manager.upload_many(
@@ -285,7 +265,7 @@ def upload_files(files: list[Path]) -> list[storage.Blob]:
         skip_if_exists=True,
         raise_exception=True,
     )
-    logger.info("Completed file(s) upload")
+    logger.info("Completed batch upload of %d file(s)", len(files))
     return blobs
 
 
@@ -294,12 +274,13 @@ def _bucket(name: str) -> storage.Bucket:
     return client.bucket(name)
 
 
-def upload_single_file(file: Path, bucket: str, blob_name: str) -> storage.Blob:
-    logger.info("Uploading file '%s' to bucket '%s' as '%s'", file, bucket, blob_name)
-    bucket: storage.Bucket = _bucket(name=bucket)
-    blob = bucket.blob(blob_name)
+def _upload_single_file(file: Path, bucket_name: str) -> storage.Blob:
+    bucket: storage.Bucket = _bucket(name=bucket_name)
+    blob = bucket.blob(file.name)
     if blob.exists():
-        logger.info("Blob '%s' already exists. Overwriting it...", blob_name)
+        logger.info("Blob '%s' already exists. Skipping upload...", blob.name)
+        return blob
+    logger.info("Uploading file '%s' to bucket '%s'", file.name, bucket_name)
     blob.upload_from_filename(str(file))
     return blob
 
@@ -342,47 +323,26 @@ class GeminiAPI(LLM):
     model_ids = available_models
 
     def complete_msgs(self, msgs: list[Message]) -> str:
-        if len(msgs) == 1:
-            msg = msgs[0]
-            paths = filepaths(msg)
-            req = SingleTurnRequest(
-                model_name=self.model_id,
-                media_files=paths,
-                prompt=msg.msg,
-                max_output_tokens=self.max_output_tokens,
-                delete_files_after_use=self.delete_files_after_use,
-            )
-        else:
-            delete_files_after_use = self.delete_files_after_use
-            if self.use_context_caching:
-                delete_files_after_use = False
+        delete_files_after_use = self.delete_files_after_use
+        if self.use_context_caching:
+            delete_files_after_use = False
 
-            req = MultiTurnRequest(
-                model_name=self.model_id,
-                messages=msgs,
-                use_context_caching=self.use_context_caching,
-                max_output_tokens=self.max_output_tokens,
-                delete_files_after_use=delete_files_after_use,
-            )
-        return req.fetch_media_description()
-
-    @singledispatchmethod
-    def video_prompt(self, video, prompt: str) -> str:
-        raise NotImplementedError(f"Unsupported video type: {type(video)}")
-
-    @video_prompt.register
-    def _(self, video: Path, prompt: str) -> str:
-        req = SingleTurnRequest(
-            model_name=self.model_id, media_files=[video], prompt=prompt
+        req = MultiTurnRequest(
+            model_name=self.model_id,
+            messages=msgs,
+            use_context_caching=self.use_context_caching,
+            max_output_tokens=self.max_output_tokens,
+            delete_files_after_use=delete_files_after_use,
         )
         return req.fetch_media_description()
 
-    @video_prompt.register
-    def _(self, video: BytesIO, prompt: str) -> str:
-        path = tempfile.mktemp(suffix=".mp4")
-        with open(path, "wb") as f:
-            f.write(video.getvalue())
-        return self.video_prompt(Path(path), prompt)
+    @singledispatchmethod
+    def video_prompt(self, video: Path | BytesIO, prompt: str) -> str:
+        req = MultiTurnRequest(
+            model_name=self.model_id,
+            messages=[Message(role="user", msg=prompt, video=video)],
+        )
+        return req.fetch_media_description()
 
     @classmethod
     def get_warnings(cls) -> list[str]:
