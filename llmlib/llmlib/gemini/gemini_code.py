@@ -52,10 +52,10 @@ class GeminiModels(StrEnum):
     https://cloud.google.com/vertex-ai/generative-ai/docs/context-cache/context-cache-overview#supported_models
     """
 
-    gemini_15_pro = "gemini-1.5-pro"
-    gemini_15_flash = "gemini-1.5-flash-002"
     gemini_20_flash = "gemini-2.0-flash-001"
     gemini_20_flash_lite = "gemini-2.0-flash-lite-001"
+    gemini_15_pro = "gemini-1.5-pro"
+    gemini_15_flash = "gemini-1.5-flash-002"
 
 
 available_models = list(GeminiModels)
