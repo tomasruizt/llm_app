@@ -145,10 +145,11 @@ def _call_gemini(
 
 
 def blobs_to_parts(blobs: list[storage.Blob]) -> list[Part]:
-    return [
-        Part.from_uri(storage_uri(Buckets.temp, b.name), mime_type=mime_type(b.name))
-        for b in blobs
-    ]
+    return [blob_to_part(b) for b in blobs]
+
+
+def blob_to_part(b: storage.Blob) -> Part:
+    return Part.from_uri(storage_uri(Buckets.temp, b.name), mime_type=mime_type(b.name))
 
 
 def delete_blobs(blobs: list[storage.Blob]) -> None:
