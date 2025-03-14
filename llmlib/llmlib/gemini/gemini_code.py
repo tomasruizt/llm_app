@@ -287,7 +287,10 @@ def dump_files_return_paths(msg: Message) -> list[Path]:
         msg.img.save(temp_file)
         paths.append(Path(temp_file))
     if msg.has_video():
-        temp_file = tempfile.mktemp(suffix=".mp4")
-        msg.video.save(temp_file)
-        paths.append(Path(temp_file))
+        if isinstance(msg.video, Path):
+            paths.append(msg.video)
+        else:
+            temp_file = tempfile.mktemp(suffix=".mp4")
+            msg.video.save(temp_file)
+            paths.append(Path(temp_file))
     return paths
