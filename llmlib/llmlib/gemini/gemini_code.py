@@ -59,11 +59,7 @@ class GeminiModels(StrEnum):
     gemini_20_flash_lite = "gemini-2.0-flash-lite-001"
 
 
-available_models = [
-    GeminiModels.gemini_15_pro,
-    GeminiModels.gemini_20_flash,
-    GeminiModels.gemini_20_flash_lite,
-]
+available_models = list(GeminiModels)
 
 
 @dataclass
