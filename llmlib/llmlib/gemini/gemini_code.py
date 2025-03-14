@@ -27,7 +27,6 @@ from google import genai
 from enum import StrEnum
 from ..base_llm import LLM, Message
 from ..error_handling import notify_bugsnag
-from cachetools.func import ttl_cache
 
 logger = getLogger(__name__)
 
