@@ -287,14 +287,19 @@ def dump_files_return_paths(msg: Message) -> list[Path]:
     """Can return 0, 1 or 2 paths"""
     paths: list[Path] = []
     if msg.has_image():
-        temp_file = tempfile.mktemp(suffix=".jpg")
-        msg.img.save(temp_file)
-        paths.append(Path(temp_file))
+        if isinstance(msg.img, Path):
+            paths.append(msg.img)
+        else:
+            raise PathNeededError()
     if msg.has_video():
         if isinstance(msg.video, Path):
             paths.append(msg.video)
         else:
-            temp_file = tempfile.mktemp(suffix=".mp4")
-            msg.video.save(temp_file)
-            paths.append(Path(temp_file))
+            raise PathNeededError()
     return paths
+
+
+def PathNeededError():
+    return ValueError(
+        "To support caching based on filename, please provide a deterministic filepath."
+    )

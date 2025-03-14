@@ -12,7 +12,7 @@ class Message:
     role: Literal["user", "assistant"]
     msg: str
     img_name: str | None = None
-    img: Image.Image | None = None
+    img: Path | Image.Image | None = None
     video: Path | BytesIO | None = None
 
     @classmethod
