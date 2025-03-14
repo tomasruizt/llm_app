@@ -20,6 +20,7 @@ dependencies = [
     "deepdiff>=8.3.0",
     "google-cloud-storage>=3.1.0",
     "opencv-python>=4.11.0.86",
+    "torchvision>=0.21.0",
 ]
 
 # I cannot add the dependencies below. I suspect that torch is a build-time dependency for flash-attn, or something like that.
