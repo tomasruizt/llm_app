@@ -65,6 +65,7 @@ def test_multiturn_conversation_with_6min_video_and_context_caching(
     assert_model_supports_multiturn_with_6min_video(model)
 
 
+@pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_get_cached_content():
     """We can cache content and reuse the cache later"""
     path: Path = file_for_test("tasting travel - rome italy.mp4")
