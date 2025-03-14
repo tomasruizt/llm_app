@@ -129,7 +129,26 @@ def assert_model_supports_multiturn(model: LLM):
     assert "Tomas" in answer
 
 
-def assert_model_supports_multiturn_with_file(model: LLM):
+def assert_model_supports_multiturn_with_6min_video(model: LLM):
+    video = file_for_test("tasting travel - rome italy.mp4")
+    convo = [Message(role="user", msg="What country are they visiting?", video=video)]
+    answer1 = model.complete_msgs(convo)
+    assert "italy" in answer1.lower()
+
+    convo.append(Message(role="assistant", msg=answer1))
+    convo.append(Message(role="user", msg="What food do they eat?"))
+    answer2 = model.complete_msgs(convo)
+    assert "lasagna" in answer2.lower()
+
+    convo.append(Message(role="assistant", msg=answer2))
+    convo.append(
+        Message(role="user", msg="What character appears in the middle of the video?")
+    )
+    answer3 = model.complete_msgs(convo)
+    assert "jesus" in answer3.lower()
+
+
+def assert_model_supports_multiturn_with_picture(model: LLM):
     q1_msg = pyramid_message()
     a1_txt = model.complete_msgs([q1_msg])
     assert "pyramid" in a1_txt.lower()
