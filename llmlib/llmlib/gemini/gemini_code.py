@@ -8,22 +8,22 @@ from io import BytesIO
 from logging import getLogger
 from pathlib import Path
 import tempfile
+from typing import Any
 from google.cloud import storage
 from google.cloud.storage import transfer_manager
-import proto
-from vertexai.generative_models import (
-    GenerativeModel,
+from google.genai.types import (
     Part,
     Content,
     HarmCategory,
     HarmBlockThreshold,
-    GenerationResponse,
+    GenerateContentResponse,
+    HttpOptions,
 )
+from google import genai
 from enum import StrEnum
 from ..base_llm import LLM, Message
 from ..error_handling import notify_bugsnag
 
-import vertexai
 
 logger = getLogger(__name__)
 
@@ -42,9 +42,9 @@ def storage_uri(bucket: str, blob_name: str) -> str:
 
 
 class GeminiModels(StrEnum):
-    gemini_15_pro = "models/gemini-1.5-pro"
-    gemini_20_flash = "models/gemini-2.0-flash"
-    gemini_20_flash_lite = "models/gemini-2.0-flash-lite"
+    gemini_15_pro = "gemini-1.5-pro"
+    gemini_20_flash = "gemini-2.0-flash"
+    gemini_20_flash_lite = "gemini-2.0-flash-lite"
 
 
 available_models = [
@@ -83,7 +83,7 @@ class MultiTurnRequest:
 def _execute_single_turn_req(req: SingleTurnRequest) -> str:
     blobs = upload_files(files=req.media_files)
     contents = [*blobs_to_parts(blobs), req.prompt]
-    response: GenerationResponse = _call_gemini(req, contents)
+    response: GenerateContentResponse = _call_gemini(req, contents)
     if req.delete_files_after_use:
         delete_blobs(blobs)
     return response.text
@@ -101,7 +101,7 @@ def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
         content, blobs = convert_to_gemini_format(msg)
         contents.append(content)
         all_blobs.extend(blobs)
-    response: GenerationResponse = _call_gemini(req, contents)
+    response: GenerateContentResponse = _call_gemini(req, contents)
     if req.delete_files_after_use:
         delete_blobs(all_blobs)
     return response.text
@@ -118,19 +118,24 @@ def convert_to_gemini_format(msg: Message) -> tuple[Content, list[storage.Blob]]
 
 def _call_gemini(
     req: SingleTurnRequest | MultiTurnRequest, contents: list[Part]
-) -> GenerationResponse:
-    init_vertex()
-    model = GenerativeModel(req.model_name)
+) -> GenerateContentResponse:
+    client = genai.Client(
+        http_options=HttpOptions(api_version="v1"),
+        vertexai=True,
+        project=project_id,
+        location=location,
+    )
     logger.info("Calling the Google API. model_name='%s'", req.model_name)
-    response: GenerationResponse = model.generate_content(
+    response: GenerateContentResponse = client.models.generate_content(
+        model=req.model_name,
         contents=contents,
-        generation_config={
+        config={
             "temperature": 0.0,
             "max_output_tokens": req.max_output_tokens,
+            "safety_settings": safety_filters(req.safety_filter_threshold),
         },
-        safety_settings=safety_filter(req.safety_filter_threshold),
     )
-    logger.info("Token usage: %s", proto.Message.to_dict(response.usage_metadata))
+    logger.info("Token usage: %s", response.usage_metadata.to_json_dict())
 
     if len(response.candidates) == 0:
         raise ResponseRefusedException(
@@ -149,7 +154,8 @@ def blobs_to_parts(blobs: list[storage.Blob]) -> list[Part]:
 
 
 def blob_to_part(b: storage.Blob) -> Part:
-    return Part.from_uri(storage_uri(Buckets.temp, b.name), mime_type=mime_type(b.name))
+    file_uri = storage_uri(Buckets.temp, b.name)
+    return Part.from_uri(file_uri=file_uri, mime_type=mime_type(b.name))
 
 
 def delete_blobs(blobs: list[storage.Blob]) -> None:
@@ -158,10 +164,6 @@ def delete_blobs(blobs: list[storage.Blob]) -> None:
     for blob in blobs:
         blob.delete()
     logger.info("Deleted %d blob(s)", len(blobs))
-
-
-def init_vertex() -> None:
-    vertexai.init(project=project_id, location=location)
 
 
 def mime_type(file_name: str) -> str:
@@ -210,10 +212,10 @@ def upload_single_file(file: Path, bucket: str, blob_name: str) -> storage.Blob:
     return blob
 
 
-def safety_filter(
+def safety_filters(
     threshold: HarmBlockThreshold,
-) -> dict[HarmCategory, HarmBlockThreshold]:
-    return {
+) -> list[dict[str, Any]]:
+    map = {
         HarmCategory.HARM_CATEGORY_UNSPECIFIED: threshold,
         HarmCategory.HARM_CATEGORY_HATE_SPEECH: threshold,
         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: threshold,
@@ -221,6 +223,7 @@ def safety_filter(
         HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: threshold,
         HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY: threshold,
     }
+    return [{"category": cat, "threshold": th} for cat, th in map.items()]
 
 
 class UnsafeResponseError(Exception):
