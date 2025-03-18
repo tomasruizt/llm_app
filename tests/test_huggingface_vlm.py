@@ -18,7 +18,12 @@ from .helpers import (
 
 @pytest.fixture
 def gemma3():
-    return HuggingFaceVLM(model_id=HuggingFaceVLMs.gemma_3_27b_it)
+    return HuggingFaceVLM(
+        model_id=HuggingFaceVLMs.gemma_3_27b_it,
+        use_hosted_model=True,
+        # 10 frames gets OOM at A100 (80GB) VRAM.
+        max_n_frames_per_video=5,
+    )
 
 
 def test_huggingface_vlm_warnings():

@@ -4,9 +4,10 @@ import base64
 import io
 from pathlib import Path
 from dataclasses import dataclass
-from huggingface_hub import InferenceClient
 import PIL
 from enum import StrEnum
+
+import openai
 from .base_llm import LLM, Message, validate_only_first_message_has_files
 import cv2
 from PIL import Image
@@ -132,6 +133,12 @@ class HuggingFaceVLMs(StrEnum):
     gemma_3_27b_it = "google/gemma-3-27b-it"
 
 
+urls = {
+    "serverless": "https://router.huggingface.co/hf-inference/v1",
+    "hosted": "https://d3zeqo83ufwxs1k3.us-east4.gcp.endpoints.huggingface.cloud/v1/",
+}
+
+
 @dataclass
 class HuggingFaceVLM(LLM):
     """Base class for HuggingFace Vision Language Models."""
@@ -140,6 +147,7 @@ class HuggingFaceVLM(LLM):
     max_new_tokens: int = 1000
     requires_gpu_exclusively: bool = False
     max_n_frames_per_video: int = 200
+    use_hosted_model: bool = False
 
     # Available model IDs
     model_ids = list(HuggingFaceVLMs)
@@ -149,8 +157,13 @@ class HuggingFaceVLM(LLM):
         if "HF_TOKEN_INFERENCE" not in os.environ:
             raise ValueError("HF_TOKEN_INFERENCE environment variable is required")
 
-        self.client = InferenceClient(
-            provider="hf-inference",
+        if self.use_hosted_model:
+            base_url = urls["hosted"]
+        else:
+            base_url = urls["serverless"]
+
+        self.client = openai.OpenAI(
+            base_url=base_url,
             api_key=os.environ["HF_TOKEN_INFERENCE"],
         )
 

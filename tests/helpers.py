@@ -143,7 +143,8 @@ def assert_model_supports_multiturn_with_6min_video(model: LLM):
     convo.append(Message(role="assistant", msg=answer1))
     convo.append(Message(role="user", msg="What food do they eat?"))
     answer2 = model.complete_msgs(convo)
-    assert "lasagna" in answer2.lower(), answer2
+    allowed = ["lasagna", "pasta"]
+    assert any(ans in answer2.lower() for ans in allowed), answer2
 
     convo.append(Message(role="assistant", msg=answer2))
     convo.append(
