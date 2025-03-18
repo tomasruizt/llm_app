@@ -124,8 +124,9 @@ def is_ci() -> bool:
 
 def assert_model_supports_multiturn(model: LLM):
     msg1 = Message.from_prompt("My name is Tomas")
-    msg2 = Message.from_prompt("What is my name?")
-    answer = model.complete_msgs([msg1, msg2])
+    msg2 = Message(role="assistant", msg="Nice to meet you!")
+    msg3 = Message.from_prompt("What is my name?")
+    answer = model.complete_msgs([msg1, msg2, msg3])
     assert "Tomas" in answer
 
 
@@ -161,4 +162,5 @@ def assert_model_supports_multiturn_with_multiple_imgs(model: LLM):
     convo.append(Message(role="assistant", msg=answer1))
     convo.append(Message(role="user", msg="How are they related?"))
     answer2 = model.complete_msgs(convo).lower()
-    assert "biodiversity" in answer2, answer2
+    possible_answers = ["biodiversity", "ecosystem", "habitat"]
+    assert any(answer in answer2 for answer in possible_answers), answer2

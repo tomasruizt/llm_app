@@ -5,6 +5,7 @@ from .minicpm import MiniCPM
 from .model_registry import ModelEntry, ModelRegistry, model_entries_from_mult_ids
 from .openai.openai_completion import OpenAIModel
 from .phi3.phi3 import Phi3Vision
+from .huggingface_inference import HuggingFaceVLM
 
 
 def filled_model_registry() -> ModelRegistry:
@@ -16,5 +17,6 @@ def filled_model_registry() -> ModelRegistry:
             ModelEntry.from_cls_with_id(PaliGemma2),
             *model_entries_from_mult_ids(OpenAIModel),
             *model_entries_from_mult_ids(GeminiAPI),
+            *model_entries_from_mult_ids(HuggingFaceVLM),
         ]
     )
