@@ -1,7 +1,10 @@
+import base64
 import os
 from pathlib import Path
 import PIL
+import cv2
 from llmlib.base_llm import LLM, Message
+import numpy as np
 import pytest
 
 
@@ -75,8 +78,10 @@ def mona_lisa_message() -> Message:
     return msg
 
 
-def pyramid_message() -> Message:
+def pyramid_message(load_img: bool = False) -> Message:
     img = file_for_test("pyramid.jpg")
+    if load_img:
+        img = PIL.Image.open(img)
     msg = Message(role="user", msg="What is in the image?", img=img, img_name="")
     return msg
 
@@ -131,8 +136,7 @@ def assert_model_supports_multiturn(model: LLM):
 
 
 def assert_model_supports_multiturn_with_6min_video(model: LLM):
-    video = file_for_test("tasting travel - rome italy.mp4")
-    convo = [Message(role="user", msg="What country are they visiting?", video=video)]
+    convo = [video_message()]
     answer1 = model.complete_msgs(convo)
     assert "italy" in answer1.lower(), answer1
 
@@ -147,6 +151,11 @@ def assert_model_supports_multiturn_with_6min_video(model: LLM):
     )
     answer3 = model.complete_msgs(convo)
     assert "jesus" in answer3.lower(), answer3
+
+
+def video_message() -> Message:
+    video = file_for_test("tasting travel - rome italy.mp4")
+    return Message(role="user", msg="What country are they visiting?", video=video)
 
 
 def assert_model_supports_multiturn_with_multiple_imgs(model: LLM):
@@ -164,3 +173,14 @@ def assert_model_supports_multiturn_with_multiple_imgs(model: LLM):
     answer2 = model.complete_msgs(convo).lower()
     possible_answers = ["biodiversity", "ecosystem", "habitat"]
     assert any(answer in answer2 for answer in possible_answers), answer2
+
+
+def decode_base64_to_array(base64_str: str) -> np.ndarray:
+    """Decode base64 string to OpenCV image (numpy array)"""
+    # Remove data URL prefix if present
+    if "base64," in base64_str:
+        base64_str = base64_str.split("base64,")[1]
+    image_data = base64.b64decode(base64_str)
+    np_array = np.frombuffer(image_data, np.uint8)
+    image = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+    return image
