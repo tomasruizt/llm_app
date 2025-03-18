@@ -24,7 +24,7 @@ from google.genai.types import (
 import cv2
 from google import genai
 from enum import StrEnum
-from ..base_llm import LLM, Message
+from ..base_llm import LLM, Message, validate_only_first_message_has_files
 from ..error_handling import notify_bugsnag
 
 logger = getLogger(__name__)
@@ -77,9 +77,7 @@ class MultiTurnRequest:
 @notify_bugsnag
 def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
     # Validation: Only the first message can have file(s)
-    for msg in req.messages[1:]:
-        if msg.has_image() or msg.has_video() or msg.files is not None:
-            raise ValueError("Only the first message can have file(s)")
+    validate_only_first_message_has_files(req.messages)
 
     # Prepare Inputs. Use context caching for media
     client = create_client()

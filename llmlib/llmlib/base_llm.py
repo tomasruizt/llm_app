@@ -47,3 +47,10 @@ class LLM:
     @classmethod
     def get_info(cls) -> list[str]:
         return []
+
+
+def validate_only_first_message_has_files(messages: list[Message]) -> None:
+    """Validate that only the first message can have file(s)."""
+    for msg in messages[1:]:
+        if msg.has_image() or msg.has_video() or msg.files is not None:
+            raise ValueError("Only the first message can have file(s)")
