@@ -20,9 +20,10 @@ from .helpers import (
 def gemma3():
     return HuggingFaceVLM(
         model_id=HuggingFaceVLMs.gemma_3_27b_it,
-        use_hosted_model=True,
+        use_hosted_model=False,
         # 10 frames gets OOM at A100 (80GB) VRAM.
-        max_n_frames_per_video=5,
+        # 4 frames gets OOM at L4 (24GB) VRAM.
+        max_n_frames_per_video=3,
     )
 
 
@@ -59,7 +60,7 @@ def test_huggingface_vlm_multi_turn_with_images(gemma3):
     assert_model_supports_multiturn_with_multiple_imgs(gemma3)
 
 
-@pytest.mark.skipif(condition=is_ci(), reason="Files are not available on CI")
+@pytest.mark.skip(reason="We currently run OOM on serverless and hosted.")
 def test_huggingface_vlm_multi_turn_with_6min_video(gemma3):
     assert_model_supports_multiturn_with_6min_video(gemma3)
 
