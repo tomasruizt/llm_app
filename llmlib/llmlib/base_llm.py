@@ -15,6 +15,7 @@ class Message:
     img_name: str | None = None
     img: Path | Image.Image | None = None
     video: Path | BytesIO | None = None
+    # TODO: make default files an empty list
     files: list[Path] | None = None
 
     @classmethod

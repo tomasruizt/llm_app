@@ -11,7 +11,7 @@ from .base_llm import LLM, Message, validate_only_first_message_has_files
 import cv2
 from PIL import Image
 from logging import getLogger
-
+from cachetools.func import ttl_cache
 
 logger = getLogger(__name__)
 
@@ -20,7 +20,9 @@ def get_image_as_base64(image_bytes: bytes):
     return base64.b64encode(image_bytes).decode("utf-8")
 
 
-def convert_message_to_openai_format(message: Message, max_n_frames_per_video: int) -> dict:
+def convert_message_to_openai_format(
+    message: Message, max_n_frames_per_video: int
+) -> dict:
     """
     Convert a Message to OpenAI chat format.
     Images become base64 encoded strings.
@@ -56,6 +58,7 @@ def convert_message_to_openai_format(message: Message, max_n_frames_per_video: i
     return {"role": message.role, "content": content}
 
 
+@ttl_cache(ttl=10 * 60)  # 10 minutes
 def video_to_imgs(video_path: Path, max_n_frames: int) -> list[PIL.Image.Image]:
     """From https://github.com/agustoslu/simple-inference-benchmark/blob/5cec55787d34af65f0d11efc429c3d4de92f051a/utils.py#L79"""
     assert isinstance(video_path, Path), video_path
