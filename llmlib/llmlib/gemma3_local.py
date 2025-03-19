@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+import time
 from llmlib.base_llm import LLM, validate_only_first_message_has_files
 import torch
 from llmlib.huggingface_inference import Message, is_img, is_video, video_to_imgs
@@ -26,7 +27,9 @@ class Gemma3Local(LLM):
         ).eval()
         self.processor = AutoProcessor.from_pretrained(self.model_id)
 
-    def complete_msgs(self, msgs: list[Message]) -> str:
+    def complete_msgs(
+        self, msgs: list[Message], output_dict: bool = False
+    ) -> str | dict:
         """Complete a conversation with the model."""
         validate_only_first_message_has_files(msgs)
 
@@ -44,12 +47,21 @@ class Gemma3Local(LLM):
         ).to(self.model.device)
 
         with torch.inference_mode():
+            start = time.time()
             outputs = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens)
+            runtime = time.time() - start
 
         input_len = len(inputs["input_ids"][0])
         response: str = self.processor.decode(
             outputs[0][input_len:], skip_special_tokens=True
         )
+        if output_dict:
+            n_frames = len([c for c in messages[0]["content"] if c["type"] == "image"])
+            return {
+                "response": response,
+                "n_frames": n_frames,
+                "model_runtime": runtime,
+            }
         return response
 
 
