@@ -3,6 +3,7 @@ Based on https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/video-
 """
 
 from dataclasses import dataclass
+from enum import Enum
 from functools import singledispatchmethod
 from io import BytesIO
 import json
@@ -23,7 +24,6 @@ from google.genai.types import (
 )
 import cv2
 from google import genai
-from enum import StrEnum
 from ..base_llm import LLM, Message, validate_only_first_message_has_files
 from ..error_handling import notify_bugsnag
 
@@ -43,7 +43,7 @@ def storage_uri(bucket: str, blob_name: str) -> str:
     return "gs://%s/%s" % (bucket, blob_name)
 
 
-class GeminiModels(StrEnum):
+class GeminiModels(str, Enum):
     """
     The 3 trailing digits indicate the stable version
     https://cloud.google.com/vertex-ai/generative-ai/docs/learn/model-versions#stable-version

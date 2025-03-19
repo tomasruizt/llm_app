@@ -6,7 +6,7 @@ authors = [
     {name = "Tomas Ruiz", email = "tomas.ruiz.te@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "bugsnag>=4.7.1",
     "decorator>=5.1.1",

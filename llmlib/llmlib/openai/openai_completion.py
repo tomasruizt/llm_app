@@ -6,7 +6,9 @@ from multiprocessing import Pool
 
 _default_model = "gpt-4o-mini"
 
-client = OpenAI()  # must be outside of the class to avoid pickling issues
+
+def create_client() -> OpenAI:
+    return OpenAI()  # must be outside of the class to avoid pickling issues
 
 
 class OpenAIModel(LLM):
@@ -43,6 +45,7 @@ def complete(model: str, prompt: str) -> str:
 
 
 def complete_msgs(model: str, messages: list[dict]) -> str:
+    client = create_client()
     completion: ChatCompletion = client.chat.completions.create(
         model=model, temperature=0.0, messages=messages
     )

@@ -1,5 +1,5 @@
 import cv2
-from llmlib.huggingface_inference import convert_message_to_hf_format
+from llmlib.huggingface_inference import convert_message_to_openai_format
 import pytest
 from llmlib.huggingface_inference import HuggingFaceVLM, HuggingFaceVLMs
 from .helpers import (
@@ -66,14 +66,14 @@ def test_huggingface_vlm_multi_turn_with_6min_video(gemma3):
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Files are not available on CI")
-def test_convert_to_huggingface_format():
+def test_convert_to_openai_format():
     img_msg1 = pyramid_message(load_img=True)
     img_msg2 = pyramid_message(load_img=False)
     max_n_frames_per_video = 200
-    b64_enc1 = convert_message_to_hf_format(img_msg1, max_n_frames_per_video)[
+    b64_enc1 = convert_message_to_openai_format(img_msg1, max_n_frames_per_video)[
         "content"
     ][1]["image_url"]["url"]
-    b64_enc2 = convert_message_to_hf_format(img_msg2, max_n_frames_per_video)[
+    b64_enc2 = convert_message_to_openai_format(img_msg2, max_n_frames_per_video)[
         "content"
     ][1]["image_url"]["url"]
     # assert b64_enc1 == b64_enc2
@@ -84,5 +84,5 @@ def test_convert_to_huggingface_format():
     cv2.imwrite(file_for_test("generated_pyramid_2.jpeg"), array2)
 
     msg = video_message()
-    hf_msg = convert_message_to_hf_format(msg, max_n_frames_per_video)
+    hf_msg = convert_message_to_openai_format(msg, max_n_frames_per_video)
     assert len(hf_msg["content"]) > 10

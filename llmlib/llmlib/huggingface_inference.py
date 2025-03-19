@@ -5,8 +5,7 @@ import io
 from pathlib import Path
 from dataclasses import dataclass
 import PIL
-from enum import StrEnum
-
+from enum import Enum
 import openai
 from .base_llm import LLM, Message, validate_only_first_message_has_files
 import cv2
@@ -21,8 +20,12 @@ def get_image_as_base64(image_bytes: bytes):
     return base64.b64encode(image_bytes).decode("utf-8")
 
 
-def convert_message_to_hf_format(message: Message, max_n_frames_per_video: int) -> dict:
-    """Convert a Message to HuggingFace chat format."""
+def convert_message_to_openai_format(message: Message, max_n_frames_per_video: int) -> dict:
+    """
+    Convert a Message to OpenAI chat format.
+    Images become base64 encoded strings.
+    Videos are processed like a list of images, each of which becomes a base64 encoded string.
+    """
     content = []
 
     # Add text content if present
@@ -54,8 +57,9 @@ def convert_message_to_hf_format(message: Message, max_n_frames_per_video: int) 
 
 
 def video_to_imgs(video_path: Path, max_n_frames: int) -> list[PIL.Image.Image]:
-    assert isinstance(video_path, Path), video_path
     """From https://github.com/agustoslu/simple-inference-benchmark/blob/5cec55787d34af65f0d11efc429c3d4de92f051a/utils.py#L79"""
+    assert isinstance(video_path, Path), video_path
+    assert video_path.exists(), video_path
     cap = cv2.VideoCapture(str(video_path))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
@@ -129,7 +133,7 @@ def extract_bytes(img: PIL.Image.Image | str | Path) -> bytes:
         raise ValueError(f"Unsupported image type: {type(img)}")
 
 
-class HuggingFaceVLMs(StrEnum):
+class HuggingFaceVLMs(str, Enum):
     gemma_3_27b_it = "google/gemma-3-27b-it"
 
 
@@ -171,7 +175,7 @@ class HuggingFaceVLM(LLM):
         """Complete a conversation with the model."""
         validate_only_first_message_has_files(msgs)
         hf_messages = [
-            convert_message_to_hf_format(
+            convert_message_to_openai_format(
                 msg, max_n_frames_per_video=self.max_n_frames_per_video
             )
             for msg in msgs
