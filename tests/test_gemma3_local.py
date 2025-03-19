@@ -15,7 +15,8 @@ cls = Gemma3Local
 
 @pytest.fixture(scope="session")
 def gemma3():
-    return cls(model_id="google/gemma-3-4b-it", max_n_frames_per_video=10)
+    # 4B model needs 12GB VRAM for 20 frames
+    return cls(model_id="google/gemma-3-4b-it", max_n_frames_per_video=20)
 
 
 def test_gemma3_local_warnings():

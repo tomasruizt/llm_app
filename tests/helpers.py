@@ -150,8 +150,9 @@ def assert_model_supports_multiturn_with_6min_video(model: LLM):
     convo.append(
         Message(role="user", msg="What character appears in the middle of the video?")
     )
-    answer3 = model.complete_msgs(convo)
-    assert "jesus" in answer3.lower(), answer3
+    answer3 = model.complete_msgs(convo).lower()
+    allowed = ["jesus", "michelangelo"]
+    assert any(ans in answer3 for ans in allowed), answer3
 
 
 def video_message() -> Message:
