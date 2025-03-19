@@ -59,8 +59,10 @@ def convert_message_to_openai_format(
 
 
 @ttl_cache(ttl=10 * 60)  # 10 minutes
-def video_to_imgs(video_path: Path, max_n_frames: int) -> list[PIL.Image.Image]:
+def video_to_imgs(video_path: Path | str, max_n_frames: int) -> list[PIL.Image.Image]:
     """From https://github.com/agustoslu/simple-inference-benchmark/blob/5cec55787d34af65f0d11efc429c3d4de92f051a/utils.py#L79"""
+    if isinstance(video_path, str):
+        video_path = Path(video_path)
     assert isinstance(video_path, Path), video_path
     assert video_path.exists(), video_path
     cap = cv2.VideoCapture(str(video_path))
