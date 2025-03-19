@@ -84,7 +84,7 @@ def video_to_imgs(video_path: Path | str, max_n_frames: int) -> list[PIL.Image.I
             frames.append(Image.fromarray(frame_rgb))
 
     cap.release()
-    logger.info(f"Extracted {len(frames)} frames from video {video_path}")
+    logger.info(f"Extracted {len(frames)} frames from video {video_path.name}")
     return frames
 
 
