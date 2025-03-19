@@ -1,5 +1,8 @@
 import cv2
-from llmlib.huggingface_inference import convert_message_to_openai_format
+from llmlib.huggingface_inference import (
+    compute_frame_indices,
+    convert_message_to_openai_format,
+)
 import pytest
 from llmlib.huggingface_inference import HuggingFaceVLM, HuggingFaceVLMs
 from .helpers import (
@@ -86,3 +89,17 @@ def test_convert_to_openai_format():
     msg = video_message()
     hf_msg = convert_message_to_openai_format(msg, max_n_frames_per_video)
     assert len(hf_msg["content"]) > 10
+
+
+def test_compute_frame_indices():
+    # 1 frame per second of video
+    idxs = compute_frame_indices(vid_n_frames=100, vid_fps=10, max_n_frames=10)
+    assert idxs == [0, 10, 20, 30, 40, 50, 60, 70, 80, 90]
+
+    # short video, return 1 frame every second
+    idxs = compute_frame_indices(vid_n_frames=100, vid_fps=30, max_n_frames=6)
+    assert idxs == [0, 30, 60, 90]
+
+    # long video, split into max_n_frames
+    idxs = compute_frame_indices(vid_n_frames=100, vid_fps=30, max_n_frames=3)
+    assert idxs == [0, 33, 66]
