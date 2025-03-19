@@ -103,3 +103,7 @@ def test_compute_frame_indices():
     # long video, split into max_n_frames
     idxs = compute_frame_indices(vid_n_frames=100, vid_fps=30, max_n_frames=3)
     assert idxs == [0, 33, 66]
+
+    # regression case
+    idx = compute_frame_indices(vid_n_frames=751, vid_fps=25.0, max_n_frames=20)
+    assert len(idx) <= 20

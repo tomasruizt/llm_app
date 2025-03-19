@@ -6,6 +6,7 @@ from pathlib import Path
 from dataclasses import dataclass
 import PIL
 from enum import Enum
+import numpy as np
 import openai
 from .base_llm import LLM, Message, validate_only_first_message_has_files
 import cv2
@@ -95,12 +96,19 @@ def compute_frame_indices(vid_n_frames: int, vid_fps: float, max_n_frames: int):
     """
     assert isinstance(vid_n_frames, int), vid_n_frames
     assert isinstance(max_n_frames, int), max_n_frames
-    vid_fps = int(vid_fps)
     fps_n_frames = math.ceil(vid_n_frames / vid_fps)
     if fps_n_frames <= max_n_frames:
-        return list(range(0, vid_n_frames - 1, vid_fps))
+        frames = np.arange(0, vid_n_frames, vid_fps, dtype=int)
     else:
-        return list(range(0, vid_n_frames - 1, vid_n_frames // max_n_frames))
+        frames = np.arange(0, vid_n_frames, vid_n_frames / max_n_frames, dtype=int)
+    if len(frames) > max_n_frames:
+        logger.error(
+            "Exceeded max_n_frames, inputs: %d, %f, %d",
+            vid_n_frames,
+            vid_fps,
+            max_n_frames,
+        )
+    return frames.tolist()
 
 
 def is_img(file_path: str | Path) -> bool:
