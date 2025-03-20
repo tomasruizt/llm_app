@@ -38,12 +38,18 @@ class Gemma3Local(LLM):
             for msg in msgs
         ]
 
+        # To fix: https://github.com/google-deepmind/gemma/issues/169
+        self.processor.tokenizer.padding_side = "left"
         inputs = self.processor.apply_chat_template(
             messages,
             add_generation_prompt=True,
             tokenize=True,
             return_dict=True,
             return_tensors="pt",
+            # To fix: https://github.com/google-deepmind/gemma/issues/169
+            padding="longest",
+            pad_to_multiple_of=8,
+            # End fix
         ).to(self.model.device)
 
         with torch.inference_mode():
