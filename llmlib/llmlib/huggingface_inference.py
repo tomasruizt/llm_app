@@ -5,9 +5,9 @@ import io
 from pathlib import Path
 from dataclasses import dataclass
 import PIL
-from enum import Enum
 import numpy as np
 import openai
+from strenum import StrEnum
 from .base_llm import LLM, Message, validate_only_first_message_has_files
 import cv2
 from PIL import Image
@@ -146,7 +146,7 @@ def extract_bytes(img: PIL.Image.Image | str | Path) -> bytes:
         raise ValueError(f"Unsupported image type: {type(img)}")
 
 
-class HuggingFaceVLMs(str, Enum):
+class HuggingFaceVLMs(StrEnum):
     gemma_3_27b_it = "google/gemma-3-27b-it"
 
 

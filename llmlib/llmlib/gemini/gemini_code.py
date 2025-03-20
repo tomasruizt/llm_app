@@ -2,9 +2,8 @@
 Based on https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/video-understanding
 """
 
+import pandas as pd
 from dataclasses import dataclass
-from enum import Enum
-from functools import singledispatchmethod
 from io import BytesIO
 import json
 from logging import getLogger
@@ -24,12 +23,16 @@ from google.genai.types import (
 )
 import cv2
 from google import genai
+import requests
+from tqdm import tqdm
+import google
+from strenum import StrEnum
 from ..base_llm import LLM, Message, validate_only_first_message_has_files
 from ..error_handling import notify_bugsnag
 
 logger = getLogger(__name__)
 
-project_id = "css-lehrbereich"  # from google cloud console
+project_id = "css-lehrbereich-schwemmer"  # (ToxicAInment) from google cloud console
 location = "europe-west1"  # https://cloud.google.com/about/locations#europe
 
 
@@ -43,7 +46,7 @@ def storage_uri(bucket: str, blob_name: str) -> str:
     return "gs://%s/%s" % (bucket, blob_name)
 
 
-class GeminiModels(str, Enum):
+class GeminiModels(StrEnum):
     """
     The 3 trailing digits indicate the stable version
     https://cloud.google.com/vertex-ai/generative-ai/docs/learn/model-versions#stable-version
@@ -272,9 +275,13 @@ def _bucket(name: str) -> storage.Bucket:
     return client.bucket(name)
 
 
-def _upload_single_file(file: Path, bucket_name: str) -> storage.Blob:
+def _upload_single_file(
+    file: Path, bucket_name: str, blob_name: str | None = None
+) -> storage.Blob:
     bucket: storage.Bucket = _bucket(name=bucket_name)
-    blob = bucket.blob(file.name)
+    if blob_name is None:
+        blob_name = file.name
+    blob = bucket.blob(blob_name)
     if blob.exists():
         logger.info("Blob '%s' already exists. Skipping upload...", blob.name)
         return blob
@@ -316,6 +323,7 @@ class GeminiAPI(LLM):
     max_output_tokens: int = 1000
     use_context_caching: bool = False
     delete_files_after_use: bool = True
+    safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
 
     requires_gpu_exclusively = False
     model_ids = available_models
@@ -331,14 +339,16 @@ class GeminiAPI(LLM):
             use_context_caching=self.use_context_caching,
             max_output_tokens=self.max_output_tokens,
             delete_files_after_use=delete_files_after_use,
+            safety_filter_threshold=self.safety_filter_threshold,
         )
         return req.fetch_media_description()
 
-    @singledispatchmethod
     def video_prompt(self, video: Path | BytesIO, prompt: str) -> str:
         req = MultiTurnRequest(
             model_name=self.model_id,
             messages=[Message(role="user", msg=prompt, video=video)],
+            max_output_tokens=self.max_output_tokens,
+            safety_filter_threshold=self.safety_filter_threshold,
         )
         return req.fetch_media_description()
 
@@ -347,6 +357,15 @@ class GeminiAPI(LLM):
         return [
             "While Gemini supports multi-turn, and multi-file chat, we have only implemented single-file and single-turn prompts atm."
         ]
+
+    def submit_batch_job(self, entries: list["BatchEntry"], tgt_dir: Path) -> str:
+        name: str = submit_batch_job(
+            model_id=self.model_id,
+            entries=entries,
+            tgt_dir=tgt_dir,
+            safety_filter_threshold=self.safety_filter_threshold,
+        )
+        return name
 
 
 def filepaths(msg: Message) -> list[Path]:
@@ -371,3 +390,107 @@ def PathNeededError():
     return ValueError(
         "To support caching based on filename, please provide a deterministic filepath."
     )
+
+
+def submit_batch_job(
+    model_id: str,
+    entries: list["BatchEntry"],
+    tgt_dir: Path,
+    safety_filter_threshold: HarmBlockThreshold,
+) -> str:
+    # Create and dump input jsonl file
+    input_rows: list[dict] = [to_batch_row(c, safety_filter_threshold) for c in entries]
+    tgt_dir.mkdir(parents=True, exist_ok=True)
+    input_jsonl = tgt_dir / "input.jsonl"
+    pd.DataFrame(input_rows).to_json(input_jsonl, orient="records", lines=True)
+
+    # Upload Input jsonl file
+    batch_name = f"batch/{tgt_dir.name}"
+    input_blob_name = f"{batch_name}/input.jsonl"
+    _upload_single_file(
+        file=input_jsonl, bucket_name=Buckets.output, blob_name=input_blob_name
+    )
+
+    # Upload media files
+    all_files = [file for e in entries for file in e.files]
+    for files in tqdm(chunk(all_files, 2500)):
+        upload_files(files)
+
+    # Submit batch job
+    output_dir = f"{batch_name}/output"
+    input_uri: str = storage_uri(Buckets.output, blob_name=input_blob_name)
+    output_uri: str = storage_uri(Buckets.output, blob_name=output_dir)
+    response = submit_batch(
+        model_id=model_id,
+        batch_name=batch_name,
+        input_uri=input_uri,
+        output_uri=output_uri,
+    )
+    response.raise_for_status()
+    logger.info("Successfully submitted batch prediction job. JSON=%s", response.json())
+    return response.json()["name"]
+
+
+@dataclass
+class BatchEntry:
+    prompt: str
+    files: list[Path]
+    """The row_data is not seen by the LLM, just used to identify the row"""
+    row_data: dict[str, str]
+
+
+def to_batch_row(be: BatchEntry, threshold: HarmBlockThreshold) -> dict:
+    file_parts = [part_dict(f) for f in be.files]
+    return {
+        "request": {
+            **be.row_data,
+            "contents": [{"role": "user", "parts": [*file_parts, {"text": be.prompt}]}],
+            # TODO: This line below might need serialization
+            "safetySettings": safety_filters(threshold=threshold),
+            "generation_config": {"temperature": 0.0},
+        },
+    }
+
+
+def part_dict(file: Path) -> dict:
+    uri = remote_uri(file)
+    return {"fileData": {"fileUri": uri, "mimeType": mime_type(file.name)}}
+
+
+def remote_uri(file: Path) -> str:
+    return storage_uri(bucket=Buckets.temp, blob_name=file.name)
+
+
+def chunk(xs, n):
+    return [xs[i : i + n] for i in range(0, len(xs), n)]
+
+
+def submit_batch(
+    model_id: str, batch_name: str, input_uri: str, output_uri: str
+) -> requests.Response:
+    # From https://stackoverflow.com/a/55804230/5730291
+    cred, project = google.auth.default()
+    # creds.valid is False, and creds.token is None
+    # Need to refresh credentials to populate those
+    auth_req = google.auth.transport.requests.Request()
+    cred.refresh(auth_req)
+
+    response = requests.post(
+        url=f"https://{location}-aiplatform.googleapis.com/v1beta1/projects/{project_id}/locations/{location}/batchPredictionJobs",
+        headers={"Authorization": f"Bearer {cred.token}"},
+        json={
+            "display_name": f"{batch_name}",
+            "model": f"publishers/google/models/{model_id}",
+            "inputConfig": {
+                "instancesFormat": "jsonl",
+                "gcsSource": {"uris": input_uri},
+            },
+            "outputConfig": {
+                "predictionsFormat": "jsonl",
+                "gcsDestination": {"outputUriPrefix": output_uri},
+            },
+            "instanceConfig": {"excludedFields": ["post_id", "username"]},
+        },
+    )
+
+    return response

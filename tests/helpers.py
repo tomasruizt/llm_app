@@ -156,8 +156,12 @@ def assert_model_supports_multiturn_with_6min_video(model: LLM):
 
 
 def video_message() -> Message:
-    video = file_for_test("tasting travel - rome italy.mp4")
+    video = video_file()
     return Message(role="user", msg="What country are they visiting?", video=video)
+
+
+def video_file() -> Path:
+    return file_for_test("tasting travel - rome italy.mp4")
 
 
 def assert_model_supports_multiturn_with_multiple_imgs(model: LLM):

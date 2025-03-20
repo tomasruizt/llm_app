@@ -1,8 +1,10 @@
 from pathlib import Path
 from llmlib.gemini.gemini_code import (
+    BatchEntry,
     GeminiAPI,
     GeminiModels,
     cache_content,
+    chunk,
     create_client,
     get_cached_content,
 )
@@ -18,6 +20,7 @@ from tests.helpers import (
     assert_model_supports_multiturn_with_multiple_imgs,
     file_for_test,
     is_ci,
+    video_file,
 )
 
 
@@ -80,3 +83,32 @@ def test_get_cached_content():
     )
     assert success
     assert isinstance(cached_content, CachedContent)
+
+
+@pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
+def test_batch_mode_inference():
+    model = GeminiAPI(model_id=GeminiModels.gemini_15_flash, max_output_tokens=500)
+    batch = [
+        BatchEntry(
+            prompt="What do you see in each image?",
+            files=[file_for_test("pyramid.jpg"), file_for_test("mona-lisa.png")],
+            row_data={"post": "123", "author": "John Doe"},
+        ),
+        BatchEntry(
+            prompt="What do you see in the video?",
+            files=[video_file()],
+            row_data={"post": "567", "author": "Jane Doe"},
+        ),
+    ]
+    tgt_dir = file_for_test("batch/unittest1/")
+    model.submit_batch_job(batch, tgt_dir=tgt_dir)
+    assert Path(tgt_dir / "input.jsonl").exists()
+
+
+def test_chunk():
+    xs = [1, 2, 3, 4, 5]
+    assert chunk(xs, 2) == [[1, 2], [3, 4], [5]]
+    assert chunk(xs, 3) == [[1, 2, 3], [4, 5]]
+
+    assert chunk([1], 2) == [[1]]
+    assert chunk([], 2) == []
