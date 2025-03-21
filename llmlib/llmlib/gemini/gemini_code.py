@@ -420,11 +420,13 @@ def submit_batch_job(
     output_dir = f"{batch_name}/output"
     input_uri: str = storage_uri(Buckets.output, blob_name=input_blob_name)
     output_uri: str = storage_uri(Buckets.output, blob_name=output_dir)
+    excluded_fields = list(set(k for e in entries for k in e.row_data.keys()))
     response = submit_batch(
         model_id=model_id,
         batch_name=batch_name,
         input_uri=input_uri,
         output_uri=output_uri,
+        excluded_fields=excluded_fields,
     )
     response.raise_for_status()
     logger.info("Successfully submitted batch prediction job. JSON=%s", response.json())
@@ -442,8 +444,8 @@ class BatchEntry:
 def to_batch_row(be: BatchEntry, threshold: HarmBlockThreshold) -> dict:
     file_parts = [part_dict(f) for f in be.files]
     return {
+        **be.row_data,
         "request": {
-            **be.row_data,
             "contents": [{"role": "user", "parts": [*file_parts, {"text": be.prompt}]}],
             # TODO: This line below might need serialization
             "safetySettings": safety_filters(threshold=threshold),
@@ -466,7 +468,11 @@ def chunk(xs, n):
 
 
 def submit_batch(
-    model_id: str, batch_name: str, input_uri: str, output_uri: str
+    model_id: str,
+    batch_name: str,
+    input_uri: str,
+    output_uri: str,
+    excluded_fields: list[str],
 ) -> requests.Response:
     # From https://stackoverflow.com/a/55804230/5730291
     cred, project = google.auth.default()
@@ -489,7 +495,7 @@ def submit_batch(
                 "predictionsFormat": "jsonl",
                 "gcsDestination": {"outputUriPrefix": output_uri},
             },
-            "instanceConfig": {"excludedFields": ["post_id", "username"]},
+            "instanceConfig": {"excludedFields": excluded_fields},
         },
     )
 

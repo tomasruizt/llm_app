@@ -8,6 +8,7 @@ from llmlib.gemini.gemini_code import (
     create_client,
     get_cached_content,
 )
+from datetime import datetime
 from google.genai.types import CachedContent
 import pytest
 
@@ -100,7 +101,7 @@ def test_batch_mode_inference():
             row_data={"post": "567", "author": "Jane Doe"},
         ),
     ]
-    tgt_dir = file_for_test("batch/unittest1/")
+    tgt_dir = file_for_test(f"batch/{datetime.now().strftime('%Y%m%d_%H%M%S')}/")
     model.submit_batch_job(batch, tgt_dir=tgt_dir)
     assert Path(tgt_dir / "input.jsonl").exists()
 
