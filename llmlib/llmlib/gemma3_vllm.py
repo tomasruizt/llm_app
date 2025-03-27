@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any, Literal
 from PIL import Image
 from vllm.engine.arg_utils import EngineArgs
 from transformers import AutoProcessor
@@ -15,25 +16,39 @@ class Gemma3vLLM(BaseLLM):
     model_id: str = "google/gemma-3-4b-it"
     max_n_frames_per_video: int = 100
     max_new_tokens: int = 500
+    gpu_size: Literal["24GB", "80GB"] = "24GB"
 
     def __post_init__(self):
+        self.processor = AutoProcessor.from_pretrained(self.model_id)
+        self._llm = None
+
+    def get_llm(self) -> LLM:
+        """Lazy initialization of the LLM to get quicker feedback on unit tests."""
+        if self._llm is not None:
+            return self._llm
+
+        batch_size = 8 if self.gpu_size == "80GB" else 2
         engine_args = EngineArgs(
             model=self.model_id,
             task="generate",
             max_model_len=8192,
-            max_num_seqs=2,
+            max_num_batched_tokens=8192 * batch_size,
+            max_num_seqs=batch_size,
             limit_mm_per_prompt={"image": self.max_n_frames_per_video},
             dtype="bfloat16",
         )
-        engine_args = asdict(engine_args)
-        self.processor = AutoProcessor.from_pretrained(self.model_id)
-        self.llm = LLM(**engine_args)
+        engine_args = asdict(engine_args)  # type: ignore
+        self._llm = LLM(**engine_args)  # type: ignore
+        return self.get_llm()
 
-    def complete_batch(self, batch: list[Conversation]) -> list[str]:
+    def complete_msgs(self, msgs: list[Message], **generate_kwargs) -> str:
+        return self.complete_batch([msgs], **generate_kwargs)[0]
+
+    def complete_batch(self, batch: list[Conversation], **generate_kwargs) -> list[str]:
         assert all(
             len(convo) == 1 for convo in batch
         ), "Each convo must have exactly one message"
-        listof_inputs: list[dict] = []
+        listof_inputs: list[dict[str, Any]] = []
         for convo in batch:
             inputs: dict = to_vllm_format(
                 self.processor,
@@ -42,13 +57,14 @@ class Gemma3vLLM(BaseLLM):
             )
             listof_inputs.append(inputs)
 
-        outputs = self.llm.generate(
-            listof_inputs,
-            sampling_params=SamplingParams(temperature=1.0, max_tokens=128),
+        params = dict(temperature=1.0, max_tokens=self.max_new_tokens) | generate_kwargs
+        outputs = self.get_llm().generate(
+            listof_inputs,  # type: ignore
+            sampling_params=SamplingParams(**params),
         )
         for o in outputs:
             request_id = o.request_id
-            n_input_tokens = len(o.prompt_token_ids)
+            n_input_tokens = len(o.prompt_token_ids)  # type: ignore
             n_output_tokens = len(o.outputs[0].token_ids)
             print(f"{request_id=}, {n_input_tokens=}, {n_output_tokens=}")
 
@@ -82,7 +98,7 @@ def to_vllm_format(
 def convert_media_to_listof_imgs(
     msg: Message, max_n_frames_per_video: int
 ) -> list[Image.Image]:
-    imgs = []
+    imgs: list[Image.Image] = []
     if msg.img is not None:
         if isinstance(msg.img, (str, Path)):
             imgs.append(Image.open(msg.img))
@@ -90,19 +106,18 @@ def convert_media_to_listof_imgs(
             imgs.append(msg.img)
 
     if msg.video is not None:
-        frames = video_to_imgs(msg.video, max_n_frames_per_video=max_n_frames_per_video)
+        frames = video_to_imgs(msg.video, max_n_frames=max_n_frames_per_video)
         imgs.extend(frames)
 
-    for filepath in msg.files:
-        if is_img(filepath):
-            imgs.append(Image.open(filepath))
-        elif is_video(filepath):
-            frames = video_to_imgs(
-                filepath, max_n_frames_per_video=max_n_frames_per_video
-            )
-            imgs.extend(frames)
-        else:
-            raise ValueError(f"Unsupported file type: {filepath}")
+    if msg.files is not None:
+        for filepath in msg.files:
+            if is_img(filepath):
+                imgs.append(Image.open(filepath))
+            elif is_video(filepath):
+                frames = video_to_imgs(filepath, max_n_frames=max_n_frames_per_video)
+                imgs.extend(frames)
+            else:
+                raise ValueError(f"Unsupported file type: {filepath}")
     return imgs
 
 

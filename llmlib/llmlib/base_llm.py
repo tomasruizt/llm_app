@@ -36,10 +36,10 @@ class LLM:
     model_id: str
     requires_gpu_exclusively: bool = False
 
-    def complete_msgs(self, msgs: Conversation) -> str:
+    def complete_msgs(self, msgs: Conversation, **generate_kwargs) -> str:
         raise NotImplementedError
 
-    def complete_batch(self, batch: list[Conversation]) -> list[str]:
+    def complete_batch(self, batch: list[Conversation], **generate_kwargs) -> list[str]:
         raise NotImplementedError
 
     def video_prompt(self, video: Path | BytesIO, prompt: str) -> str:
