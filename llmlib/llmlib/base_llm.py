@@ -29,14 +29,17 @@ class Message:
         return self.img is not None
 
 
+Conversation = list[Message]
+
+
 class LLM:
     model_id: str
     requires_gpu_exclusively: bool = False
 
-    def complete_msgs(self, msgs: list[Message]) -> str:
+    def complete_msgs(self, msgs: Conversation) -> str:
         raise NotImplementedError
 
-    def complete_batch(self, batch: list[list[Message]]) -> list[str]:
+    def complete_batch(self, batch: list[Conversation]) -> list[str]:
         raise NotImplementedError
 
     def video_prompt(self, video: Path | BytesIO, prompt: str) -> str:
