@@ -24,9 +24,17 @@ def test_gemma3_local_warnings():
     assert len(warnings) == 0
 
 
+# default params: https://huggingface.co/unsloth/gemma-3-27b-it-GGUF/blob/main/params
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
-def test_gemma3_local_complete_msgs_text_only(gemma3):
-    assert_model_knows_capital_of_france(gemma3)
+@pytest.mark.parametrize(
+    "generate_kwargs",
+    [
+        {"do_sample": False, "top_p": None, "top_k": None},  # greedy-decoding
+        {"temperature": 1.0},
+    ],
+)
+def test_gemma3_local_complete_msgs_text_only(gemma3, generate_kwargs: dict):
+    assert_model_knows_capital_of_france(gemma3, **generate_kwargs)
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")

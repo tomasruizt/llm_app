@@ -8,9 +8,10 @@ import numpy as np
 import pytest
 
 
-def assert_model_knows_capital_of_france(model: LLM) -> None:
+def assert_model_knows_capital_of_france(model: LLM, **generate_kwargs) -> None:
     response: str = model.complete_msgs(
-        msgs=[Message(role="user", msg="What is the capital of France?")]
+        msgs=[Message(role="user", msg="What is the capital of France?")],
+        **generate_kwargs,
     )
     assert "paris" in response.lower(), response
 

@@ -28,7 +28,7 @@ class Gemma3Local(LLM):
         self.processor = AutoProcessor.from_pretrained(self.model_id)
 
     def complete_msgs(
-        self, msgs: list[Message], output_dict: bool = False
+        self, msgs: list[Message], output_dict: bool = False, **generate_kwargs
     ) -> str | dict:
         """Complete a conversation with the model."""
         validate_only_first_message_has_files(msgs)
@@ -48,7 +48,11 @@ class Gemma3Local(LLM):
 
         with torch.inference_mode():
             start = time.time()
-            outputs = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens)
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=self.max_new_tokens,
+                **generate_kwargs,
+            )
             runtime = time.time() - start
 
         input_len = len(inputs["input_ids"][0])
