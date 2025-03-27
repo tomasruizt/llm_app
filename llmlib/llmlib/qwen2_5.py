@@ -27,7 +27,6 @@ class Qwen2_5(LLM):
             torch_dtype=torch.bfloat16,
         ).eval()
         self.processor = AutoProcessor.from_pretrained(self.model_id)
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         
     def complete_msgs(
         self, msgs: list[Message], output_dict: bool = False
