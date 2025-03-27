@@ -1,4 +1,5 @@
 from pathlib import Path
+import time
 from typing import Any, Literal
 from PIL import Image
 from vllm.engine.arg_utils import EngineArgs
@@ -44,41 +45,57 @@ class Gemma3vLLM(BaseLLM):
     def complete_msgs(self, msgs: list[Message], **generate_kwargs) -> str:
         return self.complete_batch([msgs], **generate_kwargs)[0]
 
-    def complete_batch(self, batch: list[Conversation], **generate_kwargs) -> list[str]:
+    def complete_batch(
+        self, batch: list[Conversation], output_dict: bool = False, **generate_kwargs
+    ) -> list[str]:
         assert all(
             len(convo) == 1 for convo in batch
         ), "Each convo must have exactly one message"
+
+        n_frames_per_convo: list[int] = []
         listof_inputs: list[dict[str, Any]] = []
         for convo in batch:
-            inputs: dict = to_vllm_format(
+            inputs, n_frames = to_vllm_format(
                 self.processor,
                 message=convo[0],
                 max_n_frames_per_video=self.max_n_frames_per_video,
             )
             listof_inputs.append(inputs)
+            n_frames_per_convo.append(n_frames)
 
         params = dict(temperature=1.0, max_tokens=self.max_new_tokens) | generate_kwargs
+
+        start = time.time()
         outputs = self.get_llm().generate(
             listof_inputs,  # type: ignore
             sampling_params=SamplingParams(**params),
         )
-        for o in outputs:
-            request_id = o.request_id
-            n_input_tokens = len(o.prompt_token_ids)  # type: ignore
-            n_output_tokens = len(o.outputs[0].token_ids)
-            print(f"{request_id=}, {n_input_tokens=}, {n_output_tokens=}")
+        runtime = time.time() - start
 
-        return [o.outputs[0].text for o in outputs]
+        responses: list[str] = [o.outputs[0].text for o in outputs]
+        if not output_dict:
+            return responses
+
+        data = {
+            "request_id": [o.request_id for o in outputs],
+            "response": responses,
+            "n_input_tokens": [len(o.prompt_token_ids) for o in outputs],  # type: ignore
+            "n_output_tokens": [len(o.outputs[0].token_ids) for o in outputs],
+            "n_frames": n_frames_per_convo,
+            "model_runtime": [runtime / len(batch)] * len(batch),  # average runtime
+        }
+        return data
 
 
 def to_vllm_format(
     processor: AutoProcessor, message: Message, max_n_frames_per_video: int
-) -> dict:
+) -> tuple[dict, int]:
     question = message.msg
     imgs = convert_media_to_listof_imgs(message, max_n_frames_per_video)
+    n_frames = len(imgs)
 
     placeholders = [
-        {"type": "image", "image": f"{idx}.jpeg"} for idx in range(len(imgs))
+        {"type": "image", "image": f"{idx}.jpeg"} for idx in range(n_frames)
     ]
     messages = [
         {"role": "user", "content": [*placeholders, {"type": "text", "text": question}]}
@@ -92,7 +109,7 @@ def to_vllm_format(
         "prompt": prompt,
         "multi_modal_data": {"image": imgs},
     }
-    return dict_input
+    return dict_input, n_frames
 
 
 def convert_media_to_listof_imgs(
