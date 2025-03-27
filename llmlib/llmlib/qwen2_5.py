@@ -27,7 +27,8 @@ class Qwen2_5(LLM):
             torch_dtype=torch.bfloat16,
         ).eval()
         self.processor = AutoProcessor.from_pretrained(self.model_id)
-
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
+        
     def complete_msgs(
         self, msgs: list[Message], output_dict: bool = False
     ) -> str | dict: 
@@ -73,7 +74,7 @@ class Qwen2_5(LLM):
 def convert_mgs_to_qwen_2_5_format(msg: Message, max_n_frames_per_video: int) -> dict:
     dict_msg = {"role": msg.role, "content": []}
     if msg.img is not None:
-        image = msg.image
+        image = msg.img
         if isinstance(image, Path):
             image = str(image)
         dict_msg["content"].append({"type": "image", "image": image})
