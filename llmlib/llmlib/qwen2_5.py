@@ -4,7 +4,7 @@ import time
 from llmlib.base_llm import LLM, validate_only_first_message_has_files
 import torch
 from llmlib.huggingface_inference import Message, is_img, is_video, video_to_imgs
-from transformers import Qwen2_5_VLForConditionalGeneration, AutoTokenizer, AutoProcessor
+from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
 from qwen_vl_utils import process_vision_info
 
 @dataclass
@@ -91,4 +91,5 @@ def convert_mgs_to_qwen_2_5_format(msg: Message, max_n_frames_per_video: int) ->
                     dict_msg["content"].append({"type": "image", "image": img})
     if msg.msg:
         dict_msg["content"].append({"type": "text", "text": msg.msg})
+
     return dict_msg
