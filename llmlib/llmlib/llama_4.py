@@ -4,26 +4,24 @@ import time
 from llmlib.base_llm import LLM, validate_only_first_message_has_files
 import torch
 from llmlib.huggingface_inference import Message, is_img, is_video, video_to_imgs
-from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
-from qwen_vl_utils import process_vision_info
+from transformers import AutoProcessor, Llama4ForConditionalGeneration
+
 
 @dataclass
-class Qwen2_5(LLM):
+class Llama_4(LLM):
     model_id: str
     max_n_frames_per_video: int = 100
     max_new_tokens: int = 500
 
     model_ids = [
-        "Qwen/Qwen2.5-VL-3B-Instruct",
-        "Qwen/Qwen2.5-VL-7B-Instruct",
-        "Qwen/Qwen2.5-VL-72B-Instruct",
+        "unsloth/Llama-4-Scout-17B-16E-Instruct",
     ]
 
     def __post_init__(self):
-        self.model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+        self.model = Llama4ForConditionalGeneration.from_pretrained(
             self.model_id,
             device_map="auto",
-            attn_implementation="flash_attention_2",
+            attn_implementation="flex_attention",
             torch_dtype=torch.bfloat16,
         ).eval()
         self.processor = AutoProcessor.from_pretrained(self.model_id)
@@ -34,33 +32,24 @@ class Qwen2_5(LLM):
         validate_only_first_message_has_files(msgs)
 
         messages: list[dict] = [
-            convert_mgs_to_qwen_2_5_format(msg, self.max_n_frames_per_video)
+            convert_mgs_to_llama_4_format(msg, self.max_n_frames_per_video)
             for msg in msgs
         ]
 
-        # prep for inference
-        text = self.processor.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True
-        )
-
-        image_inputs, video_inputs = process_vision_info(messages)
-        inputs = self.processor(
-            text=[text],
-            images=image_inputs,
-            videos=video_inputs,
-            padding=True,
-            return_tensors="pt",
+        inputs = self.processor.apply_chat_template(
+        messages,
+        add_generation_prompt=True,
+        tokenize=True,
+        return_dict=True,
+        return_tensors="pt",
         ).to(self.model.device)
-
         start = time.time()
-        generated_ids = self.model.generate(**inputs, max_new_tokens=self.max_new_tokens)
-        runtime = time.time() - start
-        generated_ids_trimmed = [
-        out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-        ]
-        response: str = self.processor.batch_decode(
-        generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+        outputs = self.model.generate(
+            **inputs,
+            max_new_tokens=self.max_new_tokens,
         )
+        runtime = time.time() - start
+        response = self.processor.batch_decode(outputs[:, inputs["input_ids"].shape[-1]:])[0]
         if output_dict:
             n_frames = len([c for c in messages[0]["content"] if c["type"] == "image"])
             return {
@@ -70,7 +59,7 @@ class Qwen2_5(LLM):
             }
         return response
 
-def convert_mgs_to_qwen_2_5_format(msg: Message, max_n_frames_per_video: int) -> dict:
+def convert_mgs_to_llama_4_format(msg: Message, max_n_frames_per_video: int) -> dict:
     dict_msg = {"role": msg.role, "content": []}
     if msg.img is not None:
         image = msg.img
