@@ -253,9 +253,7 @@ def upload_files(files: list[Path]) -> list[storage.Blob]:
     if len(files) <= 3:
         blobs = [_upload_single_file(file, Buckets.temp) for file in files]
     else:
-        blobs = []
-        for files_batch in tqdm(chunk(files, n=100)):
-            blobs.extend(_upload_batchof_files(files_batch, bucket_name=Buckets.temp))
+        blobs = _upload_batchof_files(files, bucket_name=Buckets.temp)
     return blobs
 
 
@@ -424,7 +422,7 @@ def submit_batch_job(
 
     # Upload media files
     all_files = [file for e in entries for file in e.files]
-    for files in tqdm(chunk(all_files, 2500)):
+    for files in tqdm(chunk(all_files, 500)):
         upload_files(files)
 
     # Submit batch job
