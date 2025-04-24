@@ -8,7 +8,7 @@ from io import BytesIO
 import json
 from logging import getLogger
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 from google.cloud import storage
 from google.cloud.storage import transfer_manager
 from google.genai.types import (
@@ -22,6 +22,7 @@ from google.genai.types import (
     CachedContent,
 )
 import cv2
+import os
 from google import genai
 import requests
 from tqdm import tqdm
@@ -252,12 +253,20 @@ def upload_files(files: list[Path]) -> list[storage.Blob]:
     if len(files) <= 3:
         blobs = [_upload_single_file(file, Buckets.temp) for file in files]
     else:
-        blobs = _upload_batchof_files(files, bucket_name=Buckets.temp)
+        blobs = []
+        for files_batch in tqdm(chunk(files, n=100)):
+            blobs.extend(_upload_batchof_files(files_batch, bucket_name=Buckets.temp))
     return blobs
 
 
 def _upload_batchof_files(files: list[Path], bucket_name: str) -> list[storage.Blob]:
-    logger.info("Uploading %d file(s) in batch to bucket '%s'", len(files), bucket_name)
+    n_processes = int(os.cpu_count() * 0.8)
+    logger.info(
+        "Uploading %d file(s) in batch to bucket '%s'. Using %d processes",
+        len(files),
+        bucket_name,
+        n_processes,
+    )
     bucket = _bucket(name=bucket_name)
     files_str = [str(f) for f in files]
     blobs = [bucket.blob(file.name) for file in files]
@@ -265,6 +274,8 @@ def _upload_batchof_files(files: list[Path], bucket_name: str) -> list[storage.B
         file_blob_pairs=zip(files_str, blobs),
         skip_if_exists=True,
         raise_exception=True,
+        max_workers=n_processes,
+        upload_kwargs={"timeout": 300},
     )
     logger.info("Completed batch upload of %d file(s)", len(files))
     return blobs
@@ -463,7 +474,10 @@ def remote_uri(file: Path) -> str:
     return storage_uri(bucket=Buckets.temp, blob_name=file.name)
 
 
-def chunk(xs, n):
+T = TypeVar("T")
+
+
+def chunk(xs: list[T], n: int) -> list[list[T]]:
     return [xs[i : i + n] for i in range(0, len(xs), n)]
 
 
