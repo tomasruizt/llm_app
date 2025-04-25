@@ -422,7 +422,7 @@ def submit_batch_job(
 
     # Upload media files
     all_files = [file for e in entries for file in e.files]
-    for files in tqdm(chunk(all_files, 500)):
+    for files in tqdm(chunk(all_files, 2500)):
         upload_files(files)
 
     # Submit batch job
