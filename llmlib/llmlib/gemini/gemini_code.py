@@ -56,6 +56,7 @@ class GeminiModels(StrEnum):
     https://cloud.google.com/vertex-ai/generative-ai/docs/context-cache/context-cache-overview#supported_models
     """
 
+    gemini_25_pro = "gemini-2.5-pro-preview-03-25"
     gemini_20_flash = "gemini-2.0-flash-001"
     gemini_20_flash_lite = "gemini-2.0-flash-lite-001"
     gemini_15_pro = "gemini-1.5-pro"
@@ -199,6 +200,8 @@ def _call_gemini(
         raise ResponseRefusedException(
             "No candidates in response. prompt_feedback='%s'" % response.prompt_feedback
         )
+    else:
+        logger.info("Finish reason: %s", response.candidates[0].finish_reason)
 
     enum = type(response.candidates[0].finish_reason)
     if response.candidates[0].finish_reason in {enum.SAFETY, enum.PROHIBITED_CONTENT}:
