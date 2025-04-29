@@ -2,9 +2,7 @@
 name = "llmlib"
 version = "0.1.0"
 description = ""
-authors = [
-    {name = "Tomas Ruiz", email = "tomas.ruiz.te@gmail.com"}
-]
+authors = [{ name = "Tomas Ruiz", email = "tomas.ruiz.te@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
