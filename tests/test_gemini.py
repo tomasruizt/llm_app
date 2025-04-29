@@ -34,6 +34,12 @@ def test_gemini_vision_using_interface():
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
+def test_gemini_location():
+    model = GeminiAPI(location="us-central1", max_output_tokens=50)
+    assert_model_knows_capital_of_france(model)
+
+
+@pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_multiturn_textonly_conversation():
     model = GeminiAPI(model_id=GeminiModels.gemini_20_flash_lite, max_output_tokens=50)
     assert_model_supports_multiturn(model)

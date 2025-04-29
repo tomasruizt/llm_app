@@ -34,7 +34,7 @@ from ..error_handling import notify_bugsnag
 logger = getLogger(__name__)
 
 project_id = "css-lehrbereich-schwemmer"  # (ToxicAInment) from google cloud console
-location = "europe-west1"  # https://cloud.google.com/about/locations#europe
+default_location = "europe-west1"  # https://cloud.google.com/about/locations#europe
 
 
 class Buckets:
@@ -73,6 +73,7 @@ class MultiTurnRequest:
     safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
     delete_files_after_use: bool = True
     use_context_caching: bool = False
+    location: str = default_location
 
     def fetch_media_description(self) -> str:
         return _execute_multi_turn_req(self)
@@ -84,7 +85,7 @@ def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
     validate_only_first_message_has_files(req.messages)
 
     # Prepare Inputs. Use context caching for media
-    client = create_client()
+    client = create_client(location=req.location)
     contents = [convert_to_gemini_format(msg) for msg in req.messages]
 
     files: list[Path] = filepaths(msg=req.messages[0])
@@ -206,7 +207,10 @@ def _call_gemini(
     return response
 
 
-def create_client():
+def create_client(location: str = default_location):
+    logger.info(
+        "Creating client for location='%s', project_id='%s'", location, project_id
+    )
     return genai.Client(
         http_options=HttpOptions(api_version="v1"),
         vertexai=True,
@@ -333,6 +337,7 @@ class GeminiAPI(LLM):
     use_context_caching: bool = False
     delete_files_after_use: bool = True
     safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
+    location: str = default_location  # https://cloud.google.com/about/locations#europe
 
     requires_gpu_exclusively = False
     model_ids = available_models
@@ -343,6 +348,7 @@ class GeminiAPI(LLM):
             delete_files_after_use = False
 
         req = MultiTurnRequest(
+            location=self.location,
             model_name=self.model_id,
             messages=msgs,
             use_context_caching=self.use_context_caching,
@@ -354,6 +360,7 @@ class GeminiAPI(LLM):
 
     def video_prompt(self, video: Path | BytesIO, prompt: str) -> str:
         req = MultiTurnRequest(
+            location=self.location,
             model_name=self.model_id,
             messages=[Message(role="user", msg=prompt, video=video)],
             max_output_tokens=self.max_output_tokens,
@@ -373,6 +380,7 @@ class GeminiAPI(LLM):
             entries=entries,
             tgt_dir=tgt_dir,
             safety_filter_threshold=self.safety_filter_threshold,
+            location=self.location,
         )
         return name
 
@@ -406,6 +414,7 @@ def submit_batch_job(
     entries: list["BatchEntry"],
     tgt_dir: Path,
     safety_filter_threshold: HarmBlockThreshold,
+    location: str,
 ) -> str:
     # Create and dump input jsonl file
     input_rows: list[dict] = [to_batch_row(c, safety_filter_threshold) for c in entries]
@@ -436,6 +445,7 @@ def submit_batch_job(
         input_uri=input_uri,
         output_uri=output_uri,
         excluded_fields=excluded_fields,
+        location=location,
     )
     response.raise_for_status()
     logger.info("Successfully submitted batch prediction job. JSON=%s", response.json())
@@ -485,6 +495,7 @@ def submit_batch(
     input_uri: str,
     output_uri: str,
     excluded_fields: list[str],
+    location: str,
 ) -> requests.Response:
     # From https://stackoverflow.com/a/55804230/5730291
     cred, project = google.auth.default()
