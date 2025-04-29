@@ -57,6 +57,7 @@ class GeminiModels(StrEnum):
     """
 
     gemini_25_pro = "gemini-2.5-pro-preview-03-25"
+    gemini_25_flash = "gemini-2.5-flash-preview-04-17"
     gemini_20_flash = "gemini-2.0-flash-001"
     gemini_20_flash_lite = "gemini-2.0-flash-lite-001"
     gemini_15_pro = "gemini-1.5-pro"
@@ -368,6 +369,7 @@ class GeminiAPI(LLM):
             messages=[Message(role="user", msg=prompt, video=video)],
             max_output_tokens=self.max_output_tokens,
             safety_filter_threshold=self.safety_filter_threshold,
+            delete_files_after_use=self.delete_files_after_use,
         )
         return req.fetch_media_description()
 
