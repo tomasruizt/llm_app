@@ -1,4 +1,6 @@
+import json
 from pathlib import Path
+from llmlib.base_llm import Message
 from llmlib.gemini.gemini_code import (
     BatchEntry,
     GeminiAPI,
@@ -10,6 +12,7 @@ from llmlib.gemini.gemini_code import (
 )
 from datetime import datetime
 from google.genai.types import CachedContent
+from pydantic import BaseModel
 import pytest
 
 from tests.helpers import (
@@ -41,6 +44,18 @@ def test_gemini_location():
         max_output_tokens=100,
     )
     assert_model_knows_capital_of_france(model)
+
+
+@pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
+def test_gemini_json_schema():
+    class Person(BaseModel):
+        name: str
+        age: int
+
+    model = GeminiAPI(json_schema=list[Person])
+    convo = [Message.from_prompt(prompt="Output a list of 3 people")]
+    response: str = model.complete_msgs(msgs=convo)
+    assert len(json.loads(response)) == 3
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")

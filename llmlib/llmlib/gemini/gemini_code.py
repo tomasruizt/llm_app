@@ -30,6 +30,7 @@ import google
 from strenum import StrEnum
 from ..base_llm import LLM, Message, validate_only_first_message_has_files
 from ..error_handling import notify_bugsnag
+from pydantic import BaseModel
 
 logger = getLogger(__name__)
 
@@ -76,6 +77,7 @@ class MultiTurnRequest:
     delete_files_after_use: bool = True
     use_context_caching: bool = False
     location: str = default_location
+    json_schema: type[BaseModel] | None = None
 
     def fetch_media_description(self) -> str:
         return _execute_multi_turn_req(self)
@@ -189,6 +191,10 @@ def _call_gemini(
         "max_output_tokens": req.max_output_tokens,
         "safety_settings": safety_filters(req.safety_filter_threshold),
     }
+    if req.json_schema is not None:
+        config["response_mime_type"] = "application/json"
+        config["response_schema"] = req.json_schema
+
     if isinstance(cached_content, CachedContent):
         config["cached_content"] = cached_content.name
 
@@ -342,36 +348,34 @@ class GeminiAPI(LLM):
     delete_files_after_use: bool = True
     safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
     location: str = default_location  # https://cloud.google.com/about/locations#europe
+    json_schema: type[BaseModel] | None = None
 
     requires_gpu_exclusively = False
     model_ids = available_models
 
     def complete_msgs(self, msgs: list[Message]) -> str:
-        delete_files_after_use = self.delete_files_after_use
-        if self.use_context_caching:
-            delete_files_after_use = False
-
-        req = MultiTurnRequest(
-            location=self.location,
-            model_name=self.model_id,
-            messages=msgs,
-            use_context_caching=self.use_context_caching,
-            max_output_tokens=self.max_output_tokens,
-            delete_files_after_use=delete_files_after_use,
-            safety_filter_threshold=self.safety_filter_threshold,
-        )
+        req = self._multiturn_req(msgs=msgs)
         return req.fetch_media_description()
 
     def video_prompt(self, video: Path | BytesIO, prompt: str) -> str:
+        msgs = [Message(role="user", msg=prompt, video=video)]
+        return self.complete_msgs(msgs=msgs)
+
+    def _multiturn_req(self, msgs: list[Message]) -> MultiTurnRequest:
+        delete_files_after_use = self.delete_files_after_use
+        if self.use_context_caching:
+            delete_files_after_use = False
         req = MultiTurnRequest(
-            location=self.location,
+            messages=msgs,
             model_name=self.model_id,
-            messages=[Message(role="user", msg=prompt, video=video)],
             max_output_tokens=self.max_output_tokens,
             safety_filter_threshold=self.safety_filter_threshold,
-            delete_files_after_use=self.delete_files_after_use,
+            delete_files_after_use=delete_files_after_use,
+            use_context_caching=self.use_context_caching,
+            location=self.location,
+            json_schema=self.json_schema,
         )
-        return req.fetch_media_description()
+        return req
 
     @classmethod
     def get_warnings(cls) -> list[str]:
