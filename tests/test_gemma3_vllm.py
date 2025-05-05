@@ -4,6 +4,7 @@ from .helpers import (
     assert_model_recognizes_pyramid_in_image,
     is_ci,
     assert_model_knows_capital_of_france,
+    assert_model_supports_multiple_imgs,
 )
 
 
@@ -40,6 +41,11 @@ def test_gemma3_local_complete_msgs_text_only(gemma3, generate_kwargs: dict):
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_gemma3_local_complete_msgs_with_image(gemma3):
     assert_model_recognizes_pyramid_in_image(gemma3)
+
+
+@pytest.mark.skip(reason="currently breaks the test-runner. Not sure why")
+def test_gemma3_local_complete_msgs_with_multiple_imgs(gemma3):
+    assert_model_supports_multiple_imgs(gemma3)
 
 
 # MULTITURN IS NOT SUPPORTED YET

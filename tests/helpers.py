@@ -166,20 +166,24 @@ def video_file() -> Path:
 
 
 def assert_model_supports_multiturn_with_multiple_imgs(model: LLM):
-    files = [file_for_test("forest.jpg"), file_for_test("fish.jpg")]
-    msg = Message(
-        role="user", msg="Describe each image in one short sentence", files=files
-    )
-    convo = [msg]
-    answer1 = model.complete_msgs(convo).lower()
-    assert "forest" in answer1 or "river" in answer1, answer1
-    assert "fish" in answer1, answer1
-
+    convo, answer1 = assert_model_supports_multiple_imgs(model)
     convo.append(Message(role="assistant", msg=answer1))
     convo.append(Message(role="user", msg="How are they related?"))
     answer2 = model.complete_msgs(convo).lower()
     possible_answers = ["biodiversity", "ecosystem", "habitat"]
     assert any(answer in answer2 for answer in possible_answers), answer2
+
+
+def assert_model_supports_multiple_imgs(model: LLM):
+    files = [file_for_test("forest.jpg"), file_for_test("fish.jpg")]
+    msg = Message(
+        role="user", msg="Describe each image in one short sentence", files=files
+    )
+    convo = [msg]
+    answer = model.complete_msgs(convo).lower()
+    assert "forest" in answer or "river" in answer, answer
+    assert "fish" in answer, answer
+    return convo, answer
 
 
 def decode_base64_to_array(base64_str: str) -> np.ndarray:
