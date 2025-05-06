@@ -11,10 +11,10 @@ from llmlib.huggingface_inference import is_img, video_to_imgs, is_video
 
 
 @dataclass
-class Gemma3vLLM(BaseLLM):
+class ModelvLLM(BaseLLM):
     """Inspired by https://github.com/vllm-project/vllm/blob/main/examples/offline_inference/vision_language_multi_image.py"""
 
-    model_id: str = "google/gemma-3-4b-it"
+    model_id: str  # e.g "google/gemma-3-4b-it"
     max_n_frames_per_video: int = 100
     max_new_tokens: int = 500
     gpu_size: Literal["24GB", "80GB"] = "24GB"
@@ -48,9 +48,9 @@ class Gemma3vLLM(BaseLLM):
     def complete_batch(
         self, batch: list[Conversation], output_dict: bool = False, **generate_kwargs
     ) -> list[str]:
-        assert all(
-            len(convo) == 1 for convo in batch
-        ), "Each convo must have exactly one message"
+        assert all(len(convo) == 1 for convo in batch), (
+            "Each convo must have exactly one message"
+        )
 
         n_frames_per_convo: list[int] = []
         listof_inputs: list[dict[str, Any]] = []
@@ -136,24 +136,3 @@ def convert_media_to_listof_imgs(
             else:
                 raise ValueError(f"Unsupported file type: {filepath}")
     return imgs
-
-
-if __name__ == "__main__":
-    test_file_dir = Path(__file__).parent.parent.parent / "test-files"
-    filepaths = [test_file_dir / "fish.jpg", test_file_dir / "forest.jpg"]
-    for filepath in filepaths:
-        assert filepath.exists(), filepath
-
-    msg = Message(
-        role="user",
-        msg="What is the content of each image?",
-        files=filepaths,
-    )
-    convo = [msg]
-    many_convos = [convo] * 20
-    model_name = "google/gemma-3-4b-it"
-    model = Gemma3vLLM(model_name)
-    responses: list[str] = model.complete_batch(many_convos)
-    for r in responses:
-        print(r)
-        print("-" * 100)
