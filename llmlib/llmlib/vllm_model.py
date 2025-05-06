@@ -8,6 +8,9 @@ from vllm import SamplingParams, LLM
 from dataclasses import asdict, dataclass
 from llmlib.base_llm import LLM as BaseLLM, Conversation, Message
 from llmlib.huggingface_inference import is_img, video_to_imgs, is_video
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -18,6 +21,7 @@ class ModelvLLM(BaseLLM):
     max_n_frames_per_video: int = 100
     max_new_tokens: int = 500
     gpu_size: Literal["24GB", "80GB"] = "24GB"
+    max_model_len: int = 8192
 
     def __post_init__(self):
         self.processor = AutoProcessor.from_pretrained(self.model_id)
@@ -32,14 +36,16 @@ class ModelvLLM(BaseLLM):
         engine_args = EngineArgs(
             model=self.model_id,
             task="generate",
-            max_model_len=8192,
-            max_num_batched_tokens=8192 * batch_size,
+            max_model_len=self.max_model_len,
+            max_num_batched_tokens=self.max_model_len * batch_size,
             max_num_seqs=batch_size,
             limit_mm_per_prompt={"image": self.max_n_frames_per_video},
             dtype="bfloat16",
         )
         engine_args = asdict(engine_args)  # type: ignore
+        start = time.time()
         self._llm = LLM(**engine_args)  # type: ignore
+        logger.info("Time spent in vLLM LLM() constructor: %s", time.time() - start)
         return self.get_llm()
 
     def complete_msgs(self, msgs: list[Message], **generate_kwargs) -> str:
