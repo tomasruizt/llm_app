@@ -2,13 +2,13 @@ from pathlib import Path
 import time
 from typing import Any, Literal
 from PIL import Image
-from vllm.engine.arg_utils import EngineArgs
 from transformers import AutoProcessor
-from vllm import SamplingParams, LLM
-from dataclasses import asdict, dataclass
+from vllm import AsyncEngineArgs, AsyncLLMEngine, SamplingParams, RequestOutput
+from dataclasses import dataclass
 from llmlib.base_llm import LLM as BaseLLM, Conversation, Message
 from llmlib.huggingface_inference import is_img, video_to_imgs, is_video
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -22,18 +22,19 @@ class ModelvLLM(BaseLLM):
     max_new_tokens: int = 500
     gpu_size: Literal["24GB", "80GB"] = "24GB"
     max_model_len: int = 8192
+    enforce_eager: bool = False
 
     def __post_init__(self):
         self.processor = AutoProcessor.from_pretrained(self.model_id)
         self._llm = None
 
-    def get_llm(self) -> LLM:
+    def get_llm(self) -> AsyncLLMEngine:
         """Lazy initialization of the LLM to get quicker feedback on unit tests."""
         if self._llm is not None:
             return self._llm
 
         batch_size = 8 if self.gpu_size == "80GB" else 2
-        engine_args = EngineArgs(
+        engine_args = AsyncEngineArgs(
             model=self.model_id,
             task="generate",
             max_model_len=self.max_model_len,
@@ -41,10 +42,10 @@ class ModelvLLM(BaseLLM):
             max_num_seqs=batch_size,
             limit_mm_per_prompt={"image": self.max_n_frames_per_video},
             dtype="bfloat16",
+            enforce_eager=self.enforce_eager,
         )
-        engine_args = asdict(engine_args)  # type: ignore
         start = time.time()
-        self._llm = LLM(**engine_args)  # type: ignore
+        self._llm = AsyncLLMEngine.from_engine_args(engine_args)
         logger.info("Time spent in vLLM LLM() constructor: %s", time.time() - start)
         return self.get_llm()
 
@@ -72,10 +73,9 @@ class ModelvLLM(BaseLLM):
         params = dict(temperature=1.0, max_tokens=self.max_new_tokens) | generate_kwargs
 
         start = time.time()
-        outputs = self.get_llm().generate(
-            listof_inputs,  # type: ignore
-            sampling_params=SamplingParams(**params),
-        )
+        loop = asyncio.get_event_loop()
+        future = _generate_batch_async(self._llm, listof_inputs, params)
+        outputs = loop.run_until_complete(future)
         runtime = time.time() - start
 
         responses: list[str] = [o.outputs[0].text for o in outputs]
@@ -91,6 +91,30 @@ class ModelvLLM(BaseLLM):
             "model_runtime": [runtime / len(batch)] * len(batch),  # average runtime
         }
         return data
+
+
+async def _generate_batch_async(
+    engine: AsyncLLMEngine, listof_inputs: list[dict[str, Any]], params: dict
+) -> list[RequestOutput]:
+    tasks = []
+    for idx, input in enumerate(listof_inputs):
+        not_task = _generate_async(engine, input, params, str(idx))
+        task = asyncio.create_task(not_task)
+        tasks.append(task)
+    return await asyncio.gather(*tasks)
+
+
+async def _generate_async(
+    engine: AsyncLLMEngine, input: dict[str, Any], params: dict, request_id: str
+) -> RequestOutput:
+    gen = engine.generate(
+        input,
+        sampling_params=SamplingParams(**params),
+        request_id=request_id,
+    )
+    async for output in gen:
+        final_output = output
+    return final_output
 
 
 def to_vllm_format(
@@ -111,10 +135,9 @@ def to_vllm_format(
         messages, tokenize=False, add_generation_prompt=True
     )
 
-    dict_input = {
-        "prompt": prompt,
-        "multi_modal_data": {"image": imgs},
-    }
+    dict_input = {"prompt": prompt}
+    if len(imgs) > 0:
+        dict_input["multi_modal_data"] = {"image": imgs}
     return dict_input, n_frames
 
 

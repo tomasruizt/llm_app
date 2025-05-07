@@ -38,9 +38,9 @@ def assert_model_can_answer_batch_of_img_prompts(model: LLM) -> None:
     ]
     responses = model.complete_batch(batch=batch)
     assert len(responses) == 3
-    assert "pyramid" in responses[0].lower()
-    assert "forest" in responses[1].lower()
-    assert "fish" in responses[2].lower()
+    assert "pyramid" in responses[0].lower(), responses[0]
+    assert "forest" in responses[1].lower(), responses[1]
+    assert "fish" in responses[2].lower(), responses[2]
 
 
 def assert_model_rejects_unsupported_batches(model: LLM) -> None:

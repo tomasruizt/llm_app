@@ -17,9 +17,12 @@ def vllm_model():
     model = cls(
         # model_id="google/gemma-3-4b-it",
         model_id="Qwen/Qwen2.5-VL-3B-Instruct",
-        max_n_frames_per_video=20,
+        # model_id="HuggingFaceTB/SmolVLM-256M-Instruct",
+        max_n_frames_per_video=10,
         gpu_size="24GB",
+        # enforce_eager=True,
     )
+    model.get_llm()
     yield model
 
 
