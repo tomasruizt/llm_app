@@ -5,6 +5,7 @@ from .helpers import (
     is_ci,
     assert_model_knows_capital_of_france,
     assert_model_supports_multiple_imgs,
+    assert_model_can_answer_batch_of_img_prompts,
 )
 
 
@@ -48,6 +49,11 @@ def test_vllm_model_local_complete_msgs_with_image(vllm_model):
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_vllm_model_local_complete_msgs_with_multiple_imgs(vllm_model):
     assert_model_supports_multiple_imgs(vllm_model)
+
+
+@pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
+def test_vllm_model_can_answer_batch_of_img_prompts(vllm_model):
+    assert_model_can_answer_batch_of_img_prompts(vllm_model)
 
 
 # MULTITURN IS NOT SUPPORTED YET
