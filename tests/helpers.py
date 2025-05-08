@@ -23,7 +23,7 @@ def assert_model_can_answer_batch_of_text_prompts(model: LLM) -> None:
         "What are the two tallest mountains in the world?",
     ]
     batch = [[Message.from_prompt(prompt)] for prompt in prompts]
-    responses = model.complete_batch(batch=batch)
+    responses = list(model.complete_batch(batch=batch))
     assert len(responses) == 3
     assert "paris" in responses[0].lower()
     assert "africa" in responses[1].lower()
@@ -36,7 +36,7 @@ def assert_model_can_answer_batch_of_img_prompts(model: LLM) -> None:
         [forest_message()],
         [fish_message()],
     ]
-    responses = model.complete_batch(batch=batch)
+    responses = list(model.complete_batch(batch=batch))
     assert len(responses) == 3
     assert "pyramid" in responses[0].lower(), responses[0]
     assert "forest" in responses[1].lower(), responses[1]
