@@ -9,6 +9,7 @@ from llmlib.base_llm import LLM as BaseLLM, Conversation, Message
 from llmlib.huggingface_inference import is_img, video_to_imgs, is_video
 import logging
 import asyncio
+from typing import AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -49,15 +50,16 @@ class ModelvLLM(BaseLLM):
         logger.info("Time spent in vLLM LLM() constructor: %s", time.time() - start)
         return self.get_llm()
 
-    def complete_msgs(self, msgs: list[Message], **generate_kwargs) -> str:
-        return self.complete_batch([msgs], **generate_kwargs)[0]
+    def complete_msgs(self, msgs: Conversation, **generate_kwargs) -> str:
+        gen = self.complete_batch([msgs], **generate_kwargs)
+        return next(gen)
 
     def complete_batch(
         self,
         batch: Iterable[Conversation],
         output_dict: bool = False,
         **generate_kwargs,
-    ) -> Iterable[str]:
+    ) -> Iterable[str | dict]:
         # Convert iterable to list for processing
         batch_list = list(batch)
         assert all(len(convo) == 1 for convo in batch_list), (
@@ -77,37 +79,59 @@ class ModelvLLM(BaseLLM):
 
         params = dict(temperature=1.0, max_tokens=self.max_new_tokens) | generate_kwargs
 
-        start = time.time()
         loop = asyncio.get_event_loop()
-        future = _generate_batch_async(self._llm, listof_inputs, params)
-        outputs = loop.run_until_complete(future)
-        runtime = time.time() - start
+        agen = _generate_batch_async(
+            engine=self._llm,
+            listof_inputs=listof_inputs,
+            params=params,
+            output_dict=output_dict,
+            n_frames_per_convo=n_frames_per_convo,
+        )
+        try:
+            while True:
+                start = time.time()
+                output: str | dict = loop.run_until_complete(agen.__anext__())
+                runtime = time.time() - start
+                if output_dict:
+                    assert isinstance(output, dict)
+                    output["model_runtime"] = runtime
+                yield output
+        except StopAsyncIteration:
+            pass
 
-        responses: list[str] = [o.outputs[0].text for o in outputs]
-        if not output_dict:
-            return responses
 
-        avg_runtime = runtime / len(batch_list)
-        data = {
-            "request_id": [o.request_id for o in outputs],
-            "response": responses,
-            "n_input_tokens": [len(o.prompt_token_ids) for o in outputs],  # type: ignore
-            "n_output_tokens": [len(o.outputs[0].token_ids) for o in outputs],
-            "n_frames": n_frames_per_convo,
-            "model_runtime": [avg_runtime] * len(batch_list),
-        }
-        return data
+def as_output_dict(output: RequestOutput) -> dict:
+    return {
+        "request_id": output.request_id,
+        "response": output.outputs[0].text,
+        "n_input_tokens": len(output.prompt_token_ids),  # type: ignore
+        "n_output_tokens": len(output.outputs[0].token_ids),
+    }
 
 
 async def _generate_batch_async(
-    engine: AsyncLLMEngine, listof_inputs: list[dict[str, Any]], params: dict
-) -> list[RequestOutput]:
+    engine: AsyncLLMEngine,
+    listof_inputs: list[dict[str, Any]],
+    params: dict,
+    output_dict: bool,
+    n_frames_per_convo: list[int],
+) -> AsyncGenerator[str | dict, None]:
     tasks = []
-    for idx, input in enumerate(listof_inputs):
-        not_task = _generate_async(engine, input, params, str(idx))
-        task = asyncio.create_task(not_task)
-        tasks.append(task)
-    return await asyncio.gather(*tasks)
+    reqid_2_n_frames = {}
+    for idx, (input, n_frames) in enumerate(zip(listof_inputs, n_frames_per_convo)):
+        request_id = str(idx)
+        coro = _generate_async(engine, input, params, request_id)
+        tasks.append(coro)
+        reqid_2_n_frames[request_id] = n_frames
+
+    for task in asyncio.as_completed(tasks):
+        output: RequestOutput = await task
+        if output_dict:
+            odict = as_output_dict(output)
+            odict["n_frames"] = reqid_2_n_frames[odict["request_id"]]
+            yield odict
+        else:
+            yield output.outputs[0].text
 
 
 async def _generate_async(

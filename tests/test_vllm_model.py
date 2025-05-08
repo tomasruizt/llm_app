@@ -20,7 +20,7 @@ def vllm_model():
         # model_id="HuggingFaceTB/SmolVLM-256M-Instruct",
         max_n_frames_per_video=10,
         gpu_size="24GB",
-        # enforce_eager=True,
+        enforce_eager=True,
     )
     model.get_llm()
     yield model
