@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterable
 from llmlib.base_llm import Message
 from torch import Tensor
 import torch
@@ -41,8 +41,8 @@ class Phi3Vision(LLM):
     def complete_msgs(self, msgs: list[Message]) -> str:
         return completion(llm=self, batch=[msgs])[0]
 
-    def complete_batch(self, batch: list[list[Message]]) -> list[str]:
-        return completion(llm=self, batch=batch)
+    def complete_batch(self, batch: Iterable[list[Message]]) -> Iterable[str]:
+        return completion(llm=self, batch=list(batch))
 
 
 def extract_imgs_and_dicts(msgs: list[Message]) -> tuple[list[Image.Image], list[dict]]:

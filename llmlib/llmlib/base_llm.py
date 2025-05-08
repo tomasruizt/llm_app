@@ -1,6 +1,6 @@
 from io import BytesIO
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Iterable
 from typing_extensions import Self
 from PIL import Image
 
@@ -39,7 +39,9 @@ class LLM:
     def complete_msgs(self, msgs: Conversation, **generate_kwargs) -> str:
         raise NotImplementedError
 
-    def complete_batch(self, batch: list[Conversation], **generate_kwargs) -> list[str]:
+    def complete_batch(
+        self, batch: Iterable[Conversation], **generate_kwargs
+    ) -> Iterable[str]:
         raise NotImplementedError
 
     def video_prompt(self, video: Path | BytesIO, prompt: str) -> str:

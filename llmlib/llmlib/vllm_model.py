@@ -1,6 +1,6 @@
 from pathlib import Path
 import time
-from typing import Any, Literal
+from typing import Any, Literal, Iterable
 from PIL import Image
 from transformers import AutoProcessor
 from vllm import AsyncEngineArgs, AsyncLLMEngine, SamplingParams, RequestOutput
@@ -53,15 +53,20 @@ class ModelvLLM(BaseLLM):
         return self.complete_batch([msgs], **generate_kwargs)[0]
 
     def complete_batch(
-        self, batch: list[Conversation], output_dict: bool = False, **generate_kwargs
-    ) -> list[str]:
-        assert all(len(convo) == 1 for convo in batch), (
+        self,
+        batch: Iterable[Conversation],
+        output_dict: bool = False,
+        **generate_kwargs,
+    ) -> Iterable[str]:
+        # Convert iterable to list for processing
+        batch_list = list(batch)
+        assert all(len(convo) == 1 for convo in batch_list), (
             "Each convo must have exactly one message"
         )
 
         n_frames_per_convo: list[int] = []
         listof_inputs: list[dict[str, Any]] = []
-        for convo in batch:
+        for convo in batch_list:
             inputs, n_frames = to_vllm_format(
                 self.processor,
                 message=convo[0],
@@ -82,13 +87,14 @@ class ModelvLLM(BaseLLM):
         if not output_dict:
             return responses
 
+        avg_runtime = runtime / len(batch_list)
         data = {
             "request_id": [o.request_id for o in outputs],
             "response": responses,
             "n_input_tokens": [len(o.prompt_token_ids) for o in outputs],  # type: ignore
             "n_output_tokens": [len(o.outputs[0].token_ids) for o in outputs],
             "n_frames": n_frames_per_convo,
-            "model_runtime": [runtime / len(batch)] * len(batch),  # average runtime
+            "model_runtime": [avg_runtime] * len(batch_list),
         }
         return data
 

@@ -40,17 +40,17 @@ def test_vllm_model_local_warnings():
         {"temperature": 1.0},
     ],
 )
-def test_vllm_model_local_complete_msgs_text_only(vllm_model, generate_kwargs: dict):
+def test_vllm_model_knows_capital_of_france(vllm_model, generate_kwargs: dict):
     assert_model_knows_capital_of_france(vllm_model, **generate_kwargs)
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
-def test_vllm_model_local_complete_msgs_with_image(vllm_model):
+def test_vllm_model_recognizes_pyramid_in_image(vllm_model):
     assert_model_recognizes_pyramid_in_image(vllm_model)
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
-def test_vllm_model_local_complete_msgs_with_multiple_imgs(vllm_model):
+def test_vllm_supports_multiple_imgs(vllm_model):
     assert_model_supports_multiple_imgs(vllm_model)
 
 
