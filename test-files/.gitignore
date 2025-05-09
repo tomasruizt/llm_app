@@ -4,4 +4,4 @@
 *.mp4
 *.flac
 generated_*
-batch/
+batch-files/results.jsonl
