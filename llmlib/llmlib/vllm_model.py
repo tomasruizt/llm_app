@@ -78,10 +78,11 @@ class ModelvLLM(BaseLLM):
             n_frames_per_convo.append(n_frames)
 
         params = dict(temperature=1.0, max_tokens=self.max_new_tokens) | generate_kwargs
+        engine = self.get_llm()
 
         loop = asyncio.get_event_loop()
         agen = _generate_batch_async(
-            engine=self._llm,
+            engine=engine,
             listof_inputs=listof_inputs,
             params=params,
             output_dict=output_dict,
