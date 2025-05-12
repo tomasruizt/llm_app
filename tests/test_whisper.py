@@ -48,3 +48,10 @@ def test_long_video_transcription(model: Whisper):
     video_file = file_for_test("long-video.mp4")
     transcription: str = model.transcribe_file(video_file)
     assert isinstance(transcription, str)
+
+
+@pytest.mark.skip(reason="The target behavior is not yet fully defined")
+def test_multilingual_transcription(model: Whisper):
+    file = file_for_test("multilingual-snippets.mp4")
+    transcription: str = model.transcribe_file(file)
+    assert isinstance(transcription, str)
