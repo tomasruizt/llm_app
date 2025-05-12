@@ -286,7 +286,10 @@ def dump_dataset_as_batch_request(
     df = pd.DataFrame(entries)
 
     tgt_jsonl.parent.mkdir(parents=True, exist_ok=True)
+    if tgt_jsonl.exists():
+        logger.info("Overwriting batch file '%s'", tgt_jsonl)
     df.to_json(tgt_jsonl, orient="records", lines=True)
+    logger.info("Dumped %d entries to '%s'", len(entries), tgt_jsonl)
 
 
 def to_batch_entry(
