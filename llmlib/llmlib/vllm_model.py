@@ -82,6 +82,7 @@ async def _batch_call_vllm_server(
 async def _call_vllm_server(
     client: AsyncOpenAI, messages: list[dict], params: dict, request_idx: int
 ) -> dict:
+    logger.info("Calling vLLM server for request %d", request_idx)
     completion: ChatCompletion = await client.chat.completions.create(
         messages=messages, **params
     )
