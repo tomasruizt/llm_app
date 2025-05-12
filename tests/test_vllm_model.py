@@ -76,7 +76,7 @@ def test_vllm_model_format_case2():
 def test_dump_convo_as_batch_request():
     convo1, _ = _vllm_oai_example_img()
     convo2, _ = _vllm_oai_example_video()
-    tgt_jsonl = file_for_test("batch/batch_input.jsonl")
+    tgt_jsonl = file_for_test("batch-files/batch_input.jsonl")
 
     generation_kwargs = {"temperature": 0.123}
     dump_dataset_as_batch_request(
