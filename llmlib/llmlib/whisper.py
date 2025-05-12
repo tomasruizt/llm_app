@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 import json
 from logging import getLogger
+from pathlib import Path
 from typing import Any, TypedDict
 import warnings
 import torch
@@ -62,7 +63,9 @@ class Whisper:
         default_factory=create_whisper_pipe
     )
 
-    def transcribe_file(self, file: str, translate=False) -> str:
+    def transcribe_file(self, file: str | Path, translate=False) -> str:
+        if isinstance(file, Path):
+            file = str(file)
         assert isinstance(file, str)
         logger.info("Transcribing file: %s", file)
         try:
