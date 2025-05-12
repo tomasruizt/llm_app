@@ -20,6 +20,7 @@ class ModelvLLM(BaseLLM):
     model_id: str  # e.g "google/gemma-3-4b-it"
     max_new_tokens: int = 500
     temperature: float = 0.0
+    remote_call_concurrency: int = 8
 
     def complete_msgs(
         self, msgs: Conversation, output_dict: bool = False, **generate_kwargs
@@ -46,7 +47,11 @@ class ModelvLLM(BaseLLM):
         params |= generate_kwargs
 
         loop = asyncio.get_event_loop()
-        agen = _batch_call_vllm_server(iterof_messages=listof_convos, params=params)
+        agen = _batch_call_vllm_server(
+            iterof_messages=listof_convos,
+            params=params,
+            n_concurrency=self.remote_call_concurrency,
+        )
         try:
             while True:
                 start = time.time()
@@ -67,12 +72,13 @@ def as_completion_dict(c: ChatCompletion) -> dict:
 
 
 async def _batch_call_vllm_server(
-    iterof_messages: Iterable[list[dict]], params: dict
+    iterof_messages: Iterable[list[dict]], params: dict, n_concurrency: int
 ) -> AsyncGenerator[dict, None]:
     client = AsyncOpenAI(api_key="EMPTY", base_url="http://localhost:8000/v1")
     tasks = []
+    semaphore = asyncio.Semaphore(n_concurrency)
     for request_idx, messages in enumerate(iterof_messages):
-        coro = _call_vllm_server(client, messages, params, request_idx)
+        coro = _call_vllm_server(client, messages, params, request_idx, semaphore)
         tasks.append(coro)
 
     for task in asyncio.as_completed(tasks):
@@ -80,12 +86,17 @@ async def _batch_call_vllm_server(
 
 
 async def _call_vllm_server(
-    client: AsyncOpenAI, messages: list[dict], params: dict, request_idx: int
+    client: AsyncOpenAI,
+    messages: list[dict],
+    params: dict,
+    request_idx: int,
+    semaphore: asyncio.Semaphore,
 ) -> dict:
-    logger.info("Calling vLLM server for request %d", request_idx)
-    completion: ChatCompletion = await client.chat.completions.create(
-        messages=messages, **params
-    )
+    async with semaphore:
+        logger.info("Calling vLLM server for request %d", request_idx)
+        completion: ChatCompletion = await client.chat.completions.create(
+            messages=messages, **params
+        )
     asdict: dict = as_completion_dict(completion)
     asdict["request_idx"] = request_idx
     return asdict
