@@ -1,7 +1,6 @@
-from llmlib.base_llm import Conversation
+from llmlib.base_llm import Conversation, Message
 from llmlib.vllm_model import (
     ModelvLLM,
-    Message,
     to_vllm_oai_format,
     dump_dataset_as_batch_request,
 )
@@ -26,11 +25,7 @@ def vllm_model():
         # model_id="google/gemma-3-4b-it",
         model_id="Qwen/Qwen2.5-VL-3B-Instruct",
         # model_id="HuggingFaceTB/SmolVLM-256M-Instruct",
-        max_n_frames_per_video=10,
-        gpu_size="24GB",
-        enforce_eager=True,
     )
-    model.get_llm()
     yield model
 
 
@@ -46,6 +41,7 @@ def test_vllm_model_local_warnings():
     [
         {"temperature": 0.0},  # greedy-decoding
         {"temperature": 1.0},
+        {"output_dict": True},
     ],
 )
 def test_vllm_model_knows_capital_of_france(vllm_model, generate_kwargs: dict):

@@ -9,10 +9,12 @@ import pytest
 
 
 def assert_model_knows_capital_of_france(model: LLM, **generate_kwargs) -> None:
-    response: str = model.complete_msgs(
+    response: dict | str = model.complete_msgs(
         msgs=[Message(role="user", msg="What is the capital of France?")],
         **generate_kwargs,
     )
+    if isinstance(response, dict):
+        response = response["response"]
     assert "paris" in response.lower(), response
 
 
@@ -37,6 +39,9 @@ def assert_model_can_answer_batch_of_img_prompts(model: LLM) -> None:
         [fish_message()],
     ]
     responses = list(model.complete_batch(batch=batch))
+    if isinstance(responses[0], dict):
+        responses = sorted(responses, key=lambda r: r["request_idx"])
+        responses = [r["response"] for r in responses]
     assert len(responses) == 3
     assert "pyramid" in responses[0].lower(), responses[0]
     assert "forest" in responses[1].lower(), responses[1]
@@ -87,18 +92,20 @@ def pyramid_message(load_img: bool = False) -> Message:
     return msg
 
 
-def forest_message() -> Message:
-    img_name = "forest.jpg"
-    img = get_test_img(img_name)
+def forest_message(load_img: bool = False) -> Message:
+    img: Path = file_for_test("forest.jpg")
+    if load_img:
+        img = PIL.Image.open(img)
     msg = Message(
         role="user", msg="Describe what you see in the picture.", img=img, img_name=""
     )
     return msg
 
 
-def fish_message() -> Message:
-    img_name = "fish.jpg"
-    img = get_test_img(img_name)
+def fish_message(load_img: bool = False) -> Message:
+    img: Path = file_for_test("fish.jpg")
+    if load_img:
+        img = PIL.Image.open(img)
     msg = Message(
         role="user",
         msg="What animal is depicted and where does it live?",
