@@ -94,11 +94,24 @@ async def _call_vllm_server(
 ) -> dict:
     async with semaphore:
         logger.info("Calling vLLM server for request %d", request_idx)
-        completion: ChatCompletion = await client.chat.completions.create(
-            messages=messages, **params
-        )
+        try:
+            completion: ChatCompletion = await client.chat.completions.create(
+                messages=messages, **params
+            )
+        except Exception as e:
+            # Error path
+            logger.error(
+                "Error calling vLLM server for request %d. Cause: %s",
+                request_idx,
+                repr(e),
+            )
+            asdict = {"request_idx": request_idx, "error": e, "success": False}
+            return asdict
+
+    # Happy path
     asdict: dict = as_completion_dict(completion)
     asdict["request_idx"] = request_idx
+    asdict["success"] = True
     return asdict
 
 

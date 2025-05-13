@@ -13,6 +13,7 @@ from .helpers import (
     assert_model_knows_capital_of_france,
     assert_model_supports_multiple_imgs,
     assert_model_can_answer_batch_of_img_prompts,
+    assert_model_deals_graciously_with_individual_failures,
 )
 
 
@@ -61,6 +62,11 @@ def test_vllm_supports_multiple_imgs(vllm_model):
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_vllm_model_can_answer_batch_of_img_prompts(vllm_model):
     assert_model_can_answer_batch_of_img_prompts(vllm_model)
+
+
+@pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
+def test_vllm_model_deals_graciously_with_individual_failures(vllm_model):
+    assert_model_deals_graciously_with_individual_failures(vllm_model)
 
 
 def test_vllm_model_format_case1():

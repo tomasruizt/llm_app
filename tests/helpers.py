@@ -48,6 +48,22 @@ def assert_model_can_answer_batch_of_img_prompts(model: LLM) -> None:
     assert "fish" in responses[2].lower(), responses[2]
 
 
+def assert_model_deals_graciously_with_individual_failures(model: LLM) -> None:
+    batch = [
+        [pyramid_message()],
+        [non_existing_file_message()],
+        [forest_message()],
+    ]
+    responses = model.complete_batch(batch=batch)
+    responses = sorted(responses, key=lambda r: r["request_idx"])
+    ok_response, fail_response, ok_response2 = responses
+    assert ok_response["success"]
+    assert ok_response2["success"]
+
+    assert not fail_response["success"]
+    assert fail_response["error"] is not None
+
+
 def assert_model_rejects_unsupported_batches(model: LLM) -> None:
     mixed_textonly_and_img_batch = [
         [Message.from_prompt("What is the capital of France?")],
@@ -119,6 +135,14 @@ def mona_lisa_filename_and_img() -> tuple[str, PIL.Image.Image]:
     img_name = "mona-lisa.png"
     img = get_test_img(img_name)
     return img_name, img
+
+
+def non_existing_file_message() -> Message:
+    return Message(
+        role="user",
+        msg="What is in the picture?",
+        img=file_for_test("non-existing.jpg"),
+    )
 
 
 def get_test_img(name: str) -> PIL.Image.Image:
