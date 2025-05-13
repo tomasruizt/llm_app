@@ -58,10 +58,7 @@ class ModelvLLM(BaseLLM):
         loop = asyncio.get_event_loop()
         try:
             while True:
-                start = time.time()
                 output: dict = loop.run_until_complete(agen.__anext__())
-                runtime = time.time() - start
-                output["model_runtime"] = runtime
                 yield output
         except StopAsyncIteration:
             pass
@@ -101,9 +98,11 @@ async def _call_vllm_server(
     async with semaphore:
         logger.info("Calling vLLM server for request %d", request_idx)
         try:
+            start = time.time()
             completion: ChatCompletion = await client.chat.completions.create(
                 messages=messages, **params
             )
+            runtime = time.time() - start
         except Exception as e:
             # Error path
             logger.error(
@@ -118,6 +117,7 @@ async def _call_vllm_server(
     asdict: dict = as_completion_dict(completion)
     asdict["request_idx"] = request_idx
     asdict["success"] = True
+    asdict["model_runtime"] = runtime
     return asdict
 
 

@@ -6,4 +6,5 @@ vllm-server:
 		--max-seq-len-to-capture 32768 \
 		--dtype bfloat16 \
 		--allowed-local-media-path=/home/ \
-		--limit-mm-per-prompt "image=50,video=2" 
+		--limit-mm-per-prompt "image=50,video=2" \
+		--disable-log-requests
