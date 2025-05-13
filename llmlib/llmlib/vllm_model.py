@@ -21,6 +21,7 @@ class ModelvLLM(BaseLLM):
     max_new_tokens: int = 500
     temperature: float = 0.0
     remote_call_concurrency: int = 8
+    port: int = 8000
 
     def complete_msgs(
         self, msgs: Conversation, output_dict: bool = False, **generate_kwargs
@@ -46,12 +47,15 @@ class ModelvLLM(BaseLLM):
         )
         params |= generate_kwargs
 
-        loop = asyncio.get_event_loop()
+        server = f"http://localhost:{self.port}/v1"
+        client = AsyncOpenAI(api_key="EMPTY", base_url=server)
         agen = _batch_call_vllm_server(
+            client=client,
             iterof_messages=listof_convos,
             params=params,
             n_concurrency=self.remote_call_concurrency,
         )
+        loop = asyncio.get_event_loop()
         try:
             while True:
                 start = time.time()
@@ -72,9 +76,11 @@ def as_completion_dict(c: ChatCompletion) -> dict:
 
 
 async def _batch_call_vllm_server(
-    iterof_messages: Iterable[list[dict]], params: dict, n_concurrency: int
+    client: AsyncOpenAI,
+    iterof_messages: Iterable[list[dict]],
+    params: dict,
+    n_concurrency: int,
 ) -> AsyncGenerator[dict, None]:
-    client = AsyncOpenAI(api_key="EMPTY", base_url="http://localhost:8000/v1")
     tasks = []
     semaphore = asyncio.Semaphore(n_concurrency)
     for request_idx, messages in enumerate(iterof_messages):
