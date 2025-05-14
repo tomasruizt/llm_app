@@ -1,5 +1,4 @@
 from pathlib import Path
-import time
 from typing import Any, Iterable, AsyncGenerator
 from openai import AsyncOpenAI
 from openai.types.chat.chat_completion import ChatCompletion
@@ -98,11 +97,9 @@ async def _call_vllm_server(
     async with semaphore:
         logger.info("Calling vLLM server for request %d", request_idx)
         try:
-            start = time.time()
             completion: ChatCompletion = await client.chat.completions.create(
                 messages=messages, **params
             )
-            runtime = time.time() - start
         except Exception as e:
             # Error path
             logger.error(
@@ -117,7 +114,6 @@ async def _call_vllm_server(
     asdict: dict = as_completion_dict(completion)
     asdict["request_idx"] = request_idx
     asdict["success"] = True
-    asdict["model_runtime"] = runtime
     return asdict
 
 
