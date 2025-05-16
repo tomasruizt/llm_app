@@ -9,4 +9,5 @@ vllm-server:
 		--allowed-local-media-path=/home/ \
 		--limit-mm-per-prompt "image=50,video=2" \
 		--disable-log-requests \
-		--port 8000
+		--port 8000 \
+		--gpu-memory-utilization 0.8

@@ -18,7 +18,7 @@ class ModelvLLM(BaseLLM):
 
     model_id: str  # e.g "google/gemma-3-4b-it"
     max_new_tokens: int = 500
-    temperature: float = 0.0
+    temperature: float = 0
     remote_call_concurrency: int = 8
     port: int = 8000
 
@@ -64,11 +64,13 @@ class ModelvLLM(BaseLLM):
 
 
 def as_completion_dict(c: ChatCompletion) -> dict:
-    return {
+    data = {
         "response": c.choices[0].message.content,
         "n_input_tokens": c.usage.prompt_tokens,
         "n_output_tokens": c.usage.completion_tokens,
+        "reasoning": c.choices[0].message.reasoning_content,
     }
+    return data
 
 
 async def _batch_call_vllm_server(
