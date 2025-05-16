@@ -66,9 +66,9 @@ class ModelvLLM(BaseLLM):
 def as_completion_dict(c: ChatCompletion) -> dict:
     data = {
         "response": c.choices[0].message.content,
+        "reasoning": c.choices[0].message.reasoning_content,
         "n_input_tokens": c.usage.prompt_tokens,
         "n_output_tokens": c.usage.completion_tokens,
-        "reasoning": c.choices[0].message.reasoning_content,
     }
     return data
 
