@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import json
 from logging import getLogger
 from pathlib import Path
@@ -15,7 +15,9 @@ from transformers import (
 logger = getLogger(__name__)
 
 
-def create_whisper_pipe() -> AutomaticSpeechRecognitionPipeline:
+def create_whisper_pipe(
+    attn_implementation: str = "flash_attention_2",
+) -> AutomaticSpeechRecognitionPipeline:
     device = "cuda"
     torch_dtype = torch.float16
 
@@ -24,7 +26,7 @@ def create_whisper_pipe() -> AutomaticSpeechRecognitionPipeline:
         torch_dtype=torch_dtype,
         low_cpu_mem_usage=True,
         use_safetensors=True,
-        attn_implementation="flash_attention_2",
+        attn_implementation=attn_implementation,
     )
     model.to(device)
 
@@ -58,10 +60,17 @@ model_id = "openai/whisper-large-v3-turbo"
 @dataclass
 class Whisper:
     model_id = model_id
+    use_flash_attention: bool = True
 
-    pipe: AutomaticSpeechRecognitionPipeline = field(
-        default_factory=create_whisper_pipe
-    )
+    def __post_init__(self):
+        if self.use_flash_attention:
+            attn_implementation = "flash_attention_2"
+        else:
+            attn_implementation = "sdpa"
+
+        self.pipe = create_whisper_pipe(
+            attn_implementation=attn_implementation,
+        )
 
     def transcribe_file(self, file: str | Path, translate=False) -> str:
         if isinstance(file, Path):
