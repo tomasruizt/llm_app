@@ -10,7 +10,6 @@ from llmlib.gemini.gemini_code import (
     create_client,
     get_cached_content,
 )
-from datetime import datetime
 from google.genai.types import CachedContent
 from pydantic import BaseModel
 import pytest
@@ -108,7 +107,7 @@ def test_get_cached_content():
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_batch_mode_inference():
-    model = GeminiAPI()
+    model = GeminiAPI(model_id=GeminiModels.gemini_20_flash, location="us-central1")
     batch = [
         BatchEntry(
             prompt="What do you see in each image?",
@@ -121,7 +120,7 @@ def test_batch_mode_inference():
             row_data={"post": "567", "author": "Jane Doe"},
         ),
     ]
-    tgt_dir = file_for_test(f"batch/{datetime.now().strftime('%Y%m%d_%H%M%S')}/")
+    tgt_dir = file_for_test("batch-gemini/")
     model.submit_batch_job(batch, tgt_dir=tgt_dir)
     assert Path(tgt_dir / "input.jsonl").exists()
 
