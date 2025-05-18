@@ -35,7 +35,8 @@ from pydantic import BaseModel
 logger = getLogger(__name__)
 
 project_id = "css-lehrbereich-schwemmer"  # (ToxicAInment) from google cloud console
-default_location = "europe-west1"  # https://cloud.google.com/about/locations#europe
+# On what regions is which model available? https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations#europe
+default_location = "us-central1"  # https://cloud.google.com/about/locations#europe
 
 
 class Buckets:
@@ -58,11 +59,13 @@ class GeminiModels(StrEnum):
     """
 
     gemini_25_pro = "gemini-2.5-pro-preview-03-25"
-    gemini_25_flash = "gemini-2.5-flash-preview-04-17"
+    default = gemini_25_flash = "gemini-2.5-flash-preview-04-17"
     gemini_20_flash = "gemini-2.0-flash-001"
     gemini_20_flash_lite = "gemini-2.0-flash-lite-001"
-    gemini_15_pro = "gemini-1.5-pro"
-    gemini_15_flash = "gemini-1.5-flash-002"
+
+    # 2025-05-18: Gemini 1.5 is being deprecated
+    # gemini_15_pro = "gemini-1.5-pro"
+    # gemini_15_flash = "gemini-1.5-flash-002"
 
 
 available_models = list(GeminiModels)
@@ -71,7 +74,7 @@ available_models = list(GeminiModels)
 @dataclass
 class MultiTurnRequest:
     messages: list[Message]
-    model_name: GeminiModels = GeminiModels.gemini_15_pro
+    model_name: GeminiModels = GeminiModels.default
     max_output_tokens: int = 1000
     safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
     delete_files_after_use: bool = True
@@ -342,7 +345,7 @@ class ResponseRefusedException(Exception):
 
 @dataclass
 class GeminiAPI(LLM):
-    model_id: str = GeminiModels.gemini_20_flash_lite
+    model_id: str = GeminiModels.default
     max_output_tokens: int = 1000
     use_context_caching: bool = False
     delete_files_after_use: bool = True
