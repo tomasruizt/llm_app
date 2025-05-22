@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 import logging
 import os
 from typing import Generator, Iterable, AsyncGenerator
-import requests
 import aiohttp
 import asyncio
 from ..base_llm import LLM, Conversation, Message
@@ -37,9 +36,8 @@ class OpenAIModel(LLM):
     def complete_msgs(
         self, msgs: Conversation, output_dict: bool = False
     ) -> str | dict:
-        messages: list[dict] = extract_msgs(msgs)
-        completion: dict = complete_msgs(model=self, messages=messages)
-        data: dict = as_dict(completion)
+        for data in self.complete_batch([msgs]):
+            pass  # avoid RuntimeError: async generator ignored GeneratorExit
         if not output_dict:
             return data["response"]
         return data
@@ -82,21 +80,6 @@ def as_dict(completion: dict) -> dict:
     if "reasoning" in message:
         data["reasoning"] = message["reasoning"]
     return data
-
-
-def complete_msgs(model: OpenAIModel, messages: list[dict]) -> dict:
-    url = f"{model.base_url}/chat/completions"
-    payload = {
-        "model": model.model_id,
-        "temperature": 0.0,
-        "messages": messages,
-        **model.payload_kwargs,
-    }
-
-    response = requests.post(url, headers=model.headers(), json=payload)
-    response.raise_for_status()
-    completion: dict = response.json()
-    return completion
 
 
 def extract_msgs(msgs: list[Message]) -> list[dict]:
