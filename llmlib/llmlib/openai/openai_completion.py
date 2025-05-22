@@ -1,18 +1,27 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import logging
 import os
 import requests
 from ..base_llm import LLM, Message
 from ..rest_api.restapi_client import encode_as_png_in_base64
 from multiprocessing import Pool
 
+logger = logging.getLogger(__name__)
+
 _default_model = "gpt-4o-mini"
+
+
+def get_openai_api_key() -> str:
+    logger.info("Reading OpenAI API key from environment variable")
+    return os.environ["OPENAI_API_KEY"]
 
 
 @dataclass
 class OpenAIModel(LLM):
     model: str = _default_model
     base_url: str = "https://api.openai.com/v1"
-    api_key: str = os.environ["OPENAI_API_KEY"]
+    api_key: str = field(default_factory=get_openai_api_key)
+    payload_kwargs: dict = field(default_factory=dict)
 
     def headers(self) -> dict:
         return {
@@ -84,4 +93,14 @@ def extract_msg(msg: Message) -> dict:
                 "image_url": {"url": f"data:image/png;base64,{img_in_base64}"},
             },
         ],
+    }
+
+
+def config_for_cerebras_on_openrouter() -> dict:
+    """kwargs for OpenAIModel to use Cerebras on OpenRouter"""
+    logger.info("Reading OpenRouter API key from environment variable")
+    return {
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key": os.environ["OPENROUTER_API_KEY"],
+        "payload_kwargs": {"provider": {"only": ["Cerebras"]}},
     }

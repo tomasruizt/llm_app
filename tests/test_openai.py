@@ -4,6 +4,7 @@ from llmlib.rest_api.restapi_client import encode_as_png_in_base64
 import pytest
 from llmlib.openai.openai_completion import (
     OpenAIModel,
+    config_for_cerebras_on_openrouter,
     extract_msgs,
 )
 from deepdiff import DeepDiff
@@ -47,3 +48,12 @@ def test_openai_vision():
     model: LLM = OpenAIModel()
     assert_model_knows_capital_of_france(model)
     assert_model_recognizes_pyramid_in_image(model)
+
+
+@pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
+def test_openrouter_cerebras_knows_capital_of_france():
+    model: LLM = OpenAIModel(
+        model="Qwen/Qwen3-32B",
+        **config_for_cerebras_on_openrouter(),
+    )
+    assert_model_knows_capital_of_france(model)
