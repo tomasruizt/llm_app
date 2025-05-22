@@ -36,7 +36,9 @@ class LLM:
     model_id: str
     requires_gpu_exclusively: bool = False
 
-    def complete_msgs(self, msgs: Conversation, **generate_kwargs) -> str:
+    def complete_msgs(
+        self, msgs: Conversation, output_dict: bool = False, **generate_kwargs
+    ) -> str | dict:
         raise NotImplementedError
 
     def complete_batch(

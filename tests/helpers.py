@@ -8,14 +8,30 @@ import numpy as np
 import pytest
 
 
-def assert_model_knows_capital_of_france(model: LLM, **generate_kwargs) -> None:
+def assert_model_knows_capital_of_france(
+    model: LLM,
+    output_dict: bool = False,
+    check_thoughts: bool = False,
+    **generate_kwargs,
+) -> None:
     response: dict | str = model.complete_msgs(
         msgs=[Message(role="user", msg="What is the capital of France?")],
+        output_dict=output_dict,
         **generate_kwargs,
     )
-    if isinstance(response, dict):
-        response = response["response"]
+    if output_dict:
+        assert isinstance(response, dict), type(response)
+        rdict: dict = response
+        response: str = response["response"]
+    else:
+        assert isinstance(response, str), type(response)
+
     assert "paris" in response.lower(), response
+
+    if check_thoughts:
+        assert output_dict, "check_thoughts requires output_dict=True"
+        assert "reasoning" in rdict, rdict
+        assert len(rdict["reasoning"]) > 0, rdict["reasoning"]
 
 
 def assert_model_can_answer_batch_of_text_prompts(model: LLM) -> None:

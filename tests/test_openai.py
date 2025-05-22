@@ -53,7 +53,7 @@ def test_openai_vision():
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_openrouter_cerebras_knows_capital_of_france():
     model: LLM = OpenAIModel(
-        model="Qwen/Qwen3-32B",
+        model_id="Qwen/Qwen3-32B",
         **config_for_cerebras_on_openrouter(),
     )
-    assert_model_knows_capital_of_france(model)
+    assert_model_knows_capital_of_france(model, output_dict=True, check_thoughts=True)
