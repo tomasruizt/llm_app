@@ -1,13 +1,12 @@
 from dataclasses import dataclass, field
 import logging
 import os
-from typing import Iterable, AsyncGenerator
+from typing import Generator, Iterable, AsyncGenerator
 import requests
 import aiohttp
 import asyncio
 from ..base_llm import LLM, Conversation, Message
 from ..rest_api.restapi_client import encode_as_png_in_base64
-from multiprocessing import Pool
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +34,8 @@ class OpenAIModel(LLM):
 
     model_ids = [_default_model, "gpt-4o"]
 
-    def complete(self, prompt: str) -> str:
-        return complete(model=self, prompt=prompt)
-
-    def complete_many(
-        self, prompts: list[str], n_workers: int = os.cpu_count()
-    ) -> list[str]:
-        return complete_many(model=self, prompts=prompts, n_workers=n_workers)
-
     def complete_msgs(
-        self, msgs: list[Message], output_dict: bool = False
+        self, msgs: Conversation, output_dict: bool = False
     ) -> str | dict:
         messages: list[dict] = extract_msgs(msgs)
         completion: dict = complete_msgs(model=self, messages=messages)
@@ -54,33 +45,31 @@ class OpenAIModel(LLM):
         return data
 
     def complete_batch(self, batch: Iterable[Conversation]) -> Iterable[dict]:
-        """Process a batch of conversations asynchronously.
-
-        Args:
-            batch: An iterable of Conversation objects
-
-        Returns:
-            An iterable of dictionaries containing the completion results
-        """
         listof_convos = (extract_msgs(convo) for convo in batch)
 
         params = {"model": self.model_id, "temperature": 0.0, **self.payload_kwargs}
 
-        agen = _batch_call_openai(
+        agen: AsyncGenerator[dict, None] = _batch_call_openai(
             base_url=self.base_url,
             headers=self.headers(),
             iterof_messages=listof_convos,
             params=params,
             n_concurrency=self.remote_call_concurrency,
         )
+        gen = to_synchronous_generator(agen)
+        yield from gen
 
-        loop = asyncio.get_event_loop()
-        try:
-            while True:
-                output: dict = loop.run_until_complete(agen.__anext__())
-                yield output
-        except StopAsyncIteration:
-            pass
+
+def to_synchronous_generator(
+    agen: AsyncGenerator[dict, None],
+) -> Generator[dict, None, None]:
+    loop = asyncio.get_event_loop()
+    try:
+        while True:
+            output: dict = loop.run_until_complete(agen.__anext__())
+            yield output
+    except StopAsyncIteration:
+        pass
 
 
 def as_dict(completion: dict) -> dict:
@@ -93,20 +82,6 @@ def as_dict(completion: dict) -> dict:
     if "reasoning" in message:
         data["reasoning"] = message["reasoning"]
     return data
-
-
-def complete_many(
-    model: OpenAIModel, prompts: list[str], n_workers: int = os.cpu_count()
-) -> list[str]:
-    print("Calling OpenAI API")
-    with Pool(processes=n_workers) as pool:
-        args = [(model, p) for p in prompts]
-        return pool.starmap(complete, args)
-
-
-def complete(model: OpenAIModel, prompt: str) -> str:
-    messages = [{"role": "user", "content": prompt}]
-    return complete_msgs(model=model, messages=messages)
 
 
 def complete_msgs(model: OpenAIModel, messages: list[dict]) -> dict:
@@ -122,10 +97,6 @@ def complete_msgs(model: OpenAIModel, messages: list[dict]) -> dict:
     response.raise_for_status()
     completion: dict = response.json()
     return completion
-
-
-def postprocess(response: str) -> str:
-    return response.lower().strip(".").strip()
 
 
 def extract_msgs(msgs: list[Message]) -> list[dict]:
