@@ -1,8 +1,11 @@
 from dataclasses import dataclass, field
 import logging
 import os
+from typing import Iterable, AsyncGenerator
 import requests
-from ..base_llm import LLM, Message
+import aiohttp
+import asyncio
+from ..base_llm import LLM, Conversation, Message
 from ..rest_api.restapi_client import encode_as_png_in_base64
 from multiprocessing import Pool
 
@@ -22,6 +25,7 @@ class OpenAIModel(LLM):
     base_url: str = "https://api.openai.com/v1"
     api_key: str = field(default_factory=get_openai_api_key)
     payload_kwargs: dict = field(default_factory=dict)
+    remote_call_concurrency: int = 8
 
     def headers(self) -> dict:
         return {
@@ -48,6 +52,35 @@ class OpenAIModel(LLM):
         if not output_dict:
             return data["response"]
         return data
+
+    def complete_batch(self, batch: Iterable[Conversation]) -> Iterable[dict]:
+        """Process a batch of conversations asynchronously.
+
+        Args:
+            batch: An iterable of Conversation objects
+
+        Returns:
+            An iterable of dictionaries containing the completion results
+        """
+        listof_convos = (extract_msgs(convo) for convo in batch)
+
+        params = {"model": self.model_id, "temperature": 0.0, **self.payload_kwargs}
+
+        agen = _batch_call_openai(
+            base_url=self.base_url,
+            headers=self.headers(),
+            iterof_messages=listof_convos,
+            params=params,
+            n_concurrency=self.remote_call_concurrency,
+        )
+
+        loop = asyncio.get_event_loop()
+        try:
+            while True:
+                output: dict = loop.run_until_complete(agen.__anext__())
+                yield output
+        except StopAsyncIteration:
+            pass
 
 
 def as_dict(completion: dict) -> dict:
@@ -123,3 +156,63 @@ def config_for_cerebras_on_openrouter() -> dict:
         "api_key": os.environ["OPENROUTER_API_KEY"],
         "payload_kwargs": {"provider": {"only": ["Cerebras"]}},
     }
+
+
+async def _batch_call_openai(
+    base_url: str,
+    headers: dict,
+    iterof_messages: Iterable[list[dict]],
+    params: dict,
+    n_concurrency: int,
+) -> AsyncGenerator[dict, None]:
+    tasks = []
+    semaphore = asyncio.Semaphore(n_concurrency)
+
+    async with aiohttp.ClientSession() as session:
+        for request_idx, messages in enumerate(iterof_messages):
+            coro = _call_openai(
+                session=session,
+                base_url=base_url,
+                headers=headers,
+                messages=messages,
+                params=params,
+                request_idx=request_idx,
+                semaphore=semaphore,
+            )
+            tasks.append(coro)
+
+        for task in asyncio.as_completed(tasks):
+            yield await task
+
+
+async def _call_openai(
+    session: aiohttp.ClientSession,
+    base_url: str,
+    headers: dict,
+    messages: list[dict],
+    params: dict,
+    request_idx: int,
+    semaphore: asyncio.Semaphore,
+) -> dict:
+    async with semaphore:
+        logger.info("Calling OpenAI API for request %d", request_idx)
+        try:
+            url = f"{base_url}/chat/completions"
+            payload = {**params, "messages": messages}
+
+            async with session.post(url, headers=headers, json=payload) as response:
+                response.raise_for_status()
+                completion = await response.json()
+
+                asdict = as_dict(completion)
+                asdict["request_idx"] = request_idx
+                asdict["success"] = True
+                return asdict
+
+        except Exception as e:
+            logger.error(
+                "Error calling OpenAI API for request %d. Cause: %s",
+                request_idx,
+                repr(e),
+            )
+            return {"request_idx": request_idx, "error": str(e), "success": False}

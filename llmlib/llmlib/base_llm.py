@@ -43,7 +43,7 @@ class LLM:
 
     def complete_batch(
         self, batch: Iterable[Conversation], **generate_kwargs
-    ) -> Iterable[str]:
+    ) -> Iterable[dict]:
         raise NotImplementedError
 
     def video_prompt(self, video: Path | BytesIO, prompt: str) -> str:

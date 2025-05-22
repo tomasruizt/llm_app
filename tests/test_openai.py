@@ -10,6 +10,7 @@ from llmlib.openai.openai_completion import (
 from deepdiff import DeepDiff
 
 from .helpers import (
+    assert_model_can_answer_batch_of_text_prompts,
     assert_model_knows_capital_of_france,
     assert_model_recognizes_pyramid_in_image,
     is_ci,
@@ -57,3 +58,8 @@ def test_openrouter_cerebras_knows_capital_of_france():
         **config_for_cerebras_on_openrouter(),
     )
     assert_model_knows_capital_of_france(model, output_dict=True, check_thoughts=True)
+
+
+def test_openai_can_answer_batch_of_text_prompts():
+    model: LLM = OpenAIModel()
+    assert_model_can_answer_batch_of_text_prompts(model)

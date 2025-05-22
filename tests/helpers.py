@@ -42,6 +42,9 @@ def assert_model_can_answer_batch_of_text_prompts(model: LLM) -> None:
     ]
     batch = [[Message.from_prompt(prompt)] for prompt in prompts]
     responses = list(model.complete_batch(batch=batch))
+    if isinstance(responses[0], dict):
+        responses = sorted(responses, key=lambda r: r["request_idx"])
+        responses = [r["response"] for r in responses]
     assert len(responses) == 3
     assert "paris" in responses[0].lower()
     assert "africa" in responses[1].lower()
