@@ -2,6 +2,7 @@ import base64
 import io
 import logging
 import os
+from pathlib import Path
 import requests
 from PIL import Image
 from ..base_llm import Message
@@ -12,10 +13,15 @@ from typing import Literal
 logger = logging.getLogger(__name__)
 
 
-def encode_as_png_in_base64(img: Image.Image) -> str:
-    stream = io.BytesIO()
-    img.save(stream, format="PNG")
-    return base64.b64encode(stream.getvalue()).decode("utf-8")
+def encode_as_png_in_base64(img: Image.Image | Path) -> str:
+    if isinstance(img, Path):
+        with open(img, "rb") as f:
+            bytes = f.read()
+    else:
+        stream = io.BytesIO()
+        img.save(stream, format="PNG")
+        bytes = stream.getvalue()
+    return base64.b64encode(bytes).decode("utf-8")
 
 
 class MsgDto(BaseModel):
