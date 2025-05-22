@@ -22,8 +22,8 @@ class OpenAIModel(LLM):
     model_id: str = _default_model
     base_url: str = "https://api.openai.com/v1"
     api_key: str = field(default_factory=get_openai_api_key)
-    payload_kwargs: dict = field(default_factory=dict)
-    remote_call_concurrency: int = 8
+    generation_kwargs: dict = field(default_factory=dict)
+    remote_call_concurrency: int = 32
 
     def headers(self) -> dict:
         return {
@@ -45,14 +45,15 @@ class OpenAIModel(LLM):
     def complete_batch(self, batch: Iterable[Conversation]) -> Iterable[dict]:
         listof_convos = (extract_msgs(convo) for convo in batch)
 
-        params = {"model": self.model_id, "temperature": 0.0, **self.payload_kwargs}
+        generation_kwargs = {"model": self.model_id, "temperature": 0.0}
+        generation_kwargs |= self.generation_kwargs
 
         agen: AsyncGenerator[dict, None] = _batch_call_openai(
             base_url=self.base_url,
             headers=self.headers(),
             iterof_messages=listof_convos,
-            params=params,
-            n_concurrency=self.remote_call_concurrency,
+            remote_call_concurrency=self.remote_call_concurrency,
+            generation_kwargs=generation_kwargs,
         )
         gen = to_synchronous_generator(agen)
         yield from gen
@@ -108,7 +109,7 @@ def config_for_cerebras_on_openrouter() -> dict:
     return {
         "base_url": "https://openrouter.ai/api/v1",
         "api_key": os.environ["OPENROUTER_API_KEY"],
-        "payload_kwargs": {"provider": {"only": ["Cerebras"]}},
+        "generation_kwargs": {"provider": {"only": ["Cerebras"]}},
     }
 
 
@@ -116,20 +117,22 @@ async def _batch_call_openai(
     base_url: str,
     headers: dict,
     iterof_messages: Iterable[list[dict]],
-    params: dict,
-    n_concurrency: int,
+    generation_kwargs: dict,
+    remote_call_concurrency: int,
 ) -> AsyncGenerator[dict, None]:
-    tasks = []
-    semaphore = asyncio.Semaphore(n_concurrency)
+    semaphore = asyncio.Semaphore(remote_call_concurrency)
 
+    tasks = []
     async with aiohttp.ClientSession() as session:
         for request_idx, messages in enumerate(iterof_messages):
+            post_kwargs = {
+                "url": f"{base_url}/chat/completions",
+                "headers": headers,
+                "json": {**generation_kwargs, "messages": messages},
+            }
             coro = _call_openai(
                 session=session,
-                base_url=base_url,
-                headers=headers,
-                messages=messages,
-                params=params,
+                post_kwargs=post_kwargs,
                 request_idx=request_idx,
                 semaphore=semaphore,
             )
@@ -141,20 +144,14 @@ async def _batch_call_openai(
 
 async def _call_openai(
     session: aiohttp.ClientSession,
-    base_url: str,
-    headers: dict,
-    messages: list[dict],
-    params: dict,
+    post_kwargs: dict,
     request_idx: int,
     semaphore: asyncio.Semaphore,
 ) -> dict:
     async with semaphore:
         logger.info("Calling OpenAI API for request %d", request_idx)
         try:
-            url = f"{base_url}/chat/completions"
-            payload = {**params, "messages": messages}
-
-            async with session.post(url, headers=headers, json=payload) as response:
+            async with session.post(**post_kwargs) as response:
                 response.raise_for_status()
                 completion = await response.json()
 
