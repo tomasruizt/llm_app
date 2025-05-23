@@ -1,13 +1,14 @@
 from pathlib import Path
-from typing import Any, Iterable, AsyncGenerator
-from openai import AsyncOpenAI
-from openai.types.chat.chat_completion import ChatCompletion
+from typing import Any, Iterable
 import pandas as pd
 from dataclasses import dataclass
 from llmlib.base_llm import LLM as BaseLLM, Conversation
 from llmlib.huggingface_inference import is_img, is_video
 import logging
-import asyncio
+from .openai.openai_completion import (
+    to_synchronous_generator,
+    _batch_call_openai,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +26,8 @@ class ModelvLLM(BaseLLM):
     def complete_msgs(
         self, msgs: Conversation, output_dict: bool = False, **generate_kwargs
     ) -> str | dict:
-        gen = self.complete_batch([msgs], **generate_kwargs)
-        result: dict = next(gen)
+        for result in self.complete_batch([msgs], **generate_kwargs):
+            pass  # Avoid RuntimeError: async generator ignored GeneratorExit
         if output_dict:
             return result
         else:
@@ -47,76 +48,15 @@ class ModelvLLM(BaseLLM):
         params |= generate_kwargs
 
         server = f"http://localhost:{self.port}/v1"
-        client = AsyncOpenAI(api_key="EMPTY", base_url=server)
-        agen = _batch_call_vllm_server(
-            client=client,
+        agen = _batch_call_openai(
+            base_url=server,
+            headers={"Content-Type": "application/json"},
             iterof_messages=listof_convos,
-            params=params,
-            n_concurrency=self.remote_call_concurrency,
+            generation_kwargs=params,
+            remote_call_concurrency=self.remote_call_concurrency,
         )
-        loop = asyncio.get_event_loop()
-        try:
-            while True:
-                output: dict = loop.run_until_complete(agen.__anext__())
-                yield output
-        except StopAsyncIteration:
-            pass
-
-
-def as_completion_dict(c: ChatCompletion) -> dict:
-    data = {
-        "response": c.choices[0].message.content,
-        "reasoning": c.choices[0].message.reasoning_content,
-        "n_input_tokens": c.usage.prompt_tokens,
-        "n_output_tokens": c.usage.completion_tokens,
-    }
-    return data
-
-
-async def _batch_call_vllm_server(
-    client: AsyncOpenAI,
-    iterof_messages: Iterable[list[dict]],
-    params: dict,
-    n_concurrency: int,
-) -> AsyncGenerator[dict, None]:
-    tasks = []
-    semaphore = asyncio.Semaphore(n_concurrency)
-    for request_idx, messages in enumerate(iterof_messages):
-        coro = _call_vllm_server(client, messages, params, request_idx, semaphore)
-        tasks.append(coro)
-
-    for task in asyncio.as_completed(tasks):
-        yield await task
-
-
-async def _call_vllm_server(
-    client: AsyncOpenAI,
-    messages: list[dict],
-    params: dict,
-    request_idx: int,
-    semaphore: asyncio.Semaphore,
-) -> dict:
-    async with semaphore:
-        logger.info("Calling vLLM server for request %d", request_idx)
-        try:
-            completion: ChatCompletion = await client.chat.completions.create(
-                messages=messages, **params
-            )
-        except Exception as e:
-            # Error path
-            logger.error(
-                "Error calling vLLM server for request %d. Cause: %s",
-                request_idx,
-                repr(e),
-            )
-            asdict = {"request_idx": request_idx, "error": e, "success": False}
-            return asdict
-
-    # Happy path
-    asdict: dict = as_completion_dict(completion)
-    asdict["request_idx"] = request_idx
-    asdict["success"] = True
-    return asdict
+        gen = to_synchronous_generator(agen)
+        return gen
 
 
 def to_vllm_oai_format(convo: Conversation) -> list[dict]:

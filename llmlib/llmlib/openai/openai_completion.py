@@ -56,7 +56,7 @@ class OpenAIModel(LLM):
             generation_kwargs=generation_kwargs,
         )
         gen = to_synchronous_generator(agen)
-        yield from gen
+        return gen
 
 
 def to_synchronous_generator(
