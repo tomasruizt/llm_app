@@ -78,8 +78,10 @@ def as_dict(completion: dict) -> dict:
         "n_input_tokens": completion["usage"]["prompt_tokens"],
         "n_output_tokens": completion["usage"]["completion_tokens"],
     }
-    if "reasoning" in message:
+    if "reasoning" in message:  # OpenAI format
         data["reasoning"] = message["reasoning"]
+    elif "reasoning_content" in message:  # vLLM format
+        data["reasoning"] = message["reasoning_content"]
     return data
 
 
