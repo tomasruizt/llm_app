@@ -34,6 +34,20 @@ def assert_model_knows_capital_of_france(
         assert len(rdict["reasoning"]) > 0, rdict["reasoning"]
 
 
+def assert_model_returns_passed_metadata(model: LLM):
+    convo1 = [Message(role="user", msg="What is the capital of France?")]
+    convo2 = [Message.from_prompt("What is the capital of Germany?")]
+    metadata1 = {"country": "France"}
+    metadata2 = {"country": "Germany"}
+
+    responses = model.complete_batch([convo1, convo2], metadatas=[metadata1, metadata2])
+    r1, r2 = list(sorted(responses, key=lambda r: r["request_idx"]))
+    assert "country" in r1, r1
+    assert r1["country"] == "France", r1["country"]
+    assert "country" in r2, r2
+    assert r2["country"] == "Germany", r2["country"]
+
+
 def assert_model_can_answer_batch_of_text_prompts(model: LLM) -> None:
     prompts = [
         "What is the capital of France?",

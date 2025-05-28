@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from itertools import cycle
 import logging
 import os
 from typing import Generator, Iterable, AsyncGenerator
@@ -42,18 +43,21 @@ class OpenAIModel(LLM):
             return data["response"]
         return data
 
-    def complete_batch(self, batch: Iterable[Conversation]) -> Iterable[dict]:
+    def complete_batch(
+        self, batch: Iterable[Conversation], metadatas: Iterable[dict] | None = None
+    ) -> Iterable[dict]:
         listof_convos = (extract_msgs(convo) for convo in batch)
 
-        generation_kwargs = {"model": self.model_id, "temperature": 0.0}
-        generation_kwargs |= self.generation_kwargs
+        gen_kwargs = {"model": self.model_id, "temperature": 0.0}
+        gen_kwargs = gen_kwargs | self.generation_kwargs
 
         agen: AsyncGenerator[dict, None] = _batch_call_openai(
             base_url=self.base_url,
             headers=self.headers(),
             iterof_messages=listof_convos,
+            metadatas=metadatas,
             remote_call_concurrency=self.remote_call_concurrency,
-            generation_kwargs=generation_kwargs,
+            gen_kwargs=gen_kwargs,
         )
         gen = to_synchronous_generator(agen)
         return gen
@@ -119,24 +123,31 @@ async def _batch_call_openai(
     base_url: str,
     headers: dict,
     iterof_messages: Iterable[list[dict]],
-    generation_kwargs: dict,
+    gen_kwargs: dict,
     remote_call_concurrency: int,
     timeout_secs: int = 60,
+    metadatas: Iterable[dict] | None = None,
 ) -> AsyncGenerator[dict, None]:
+    if metadatas is None:
+        metadatas = cycle([{}])
+
     tasks = []
     timeout = aiohttp.ClientTimeout(total=timeout_secs)
     connector = aiohttp.TCPConnector(limit=remote_call_concurrency)
     async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
-        for request_idx, messages in enumerate(iterof_messages):
+        for request_idx, (messages, metadata) in enumerate(
+            zip(iterof_messages, metadatas)
+        ):
             post_kwargs = {
                 "url": f"{base_url}/chat/completions",
                 "headers": headers,
-                "json": {**generation_kwargs, "messages": messages},
+                "json": {**gen_kwargs, "messages": messages},
             }
+            metadata = metadata | {"request_idx": request_idx}
             coro = _call_openai(
                 session=session,
                 post_kwargs=post_kwargs,
-                request_idx=request_idx,
+                metadata=metadata,
             )
             tasks.append(coro)
 
@@ -147,15 +158,15 @@ async def _batch_call_openai(
 async def _call_openai(
     session: aiohttp.ClientSession,
     post_kwargs: dict,
-    request_idx: int,
+    metadata: dict,
 ) -> dict:
+    request_idx = metadata["request_idx"]
     logger.debug("Calling OpenAI API for request %d", request_idx)
     try:
         async with session.post(**post_kwargs) as response:
             response.raise_for_status()
             completion = await response.json()
-        asdict = as_dict(completion)
-        asdict["request_idx"] = request_idx
+        asdict = as_dict(completion) | metadata
         asdict["success"] = True
         return asdict
 

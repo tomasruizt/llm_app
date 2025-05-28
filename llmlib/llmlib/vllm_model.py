@@ -37,6 +37,7 @@ class ModelvLLM(BaseLLM):
     def complete_batch(
         self,
         batch: Iterable[Conversation],
+        metadatas: Iterable[dict] | None = None,
         **generate_kwargs,
     ) -> Iterable[dict]:
         listof_convos = (to_vllm_oai_format(convo) for convo in batch)
@@ -46,16 +47,17 @@ class ModelvLLM(BaseLLM):
             temperature=self.temperature,
             max_tokens=self.max_new_tokens,
         )
-        params |= generate_kwargs
+        params = params | generate_kwargs
 
         server = f"http://localhost:{self.port}/v1"
         agen = _batch_call_openai(
             base_url=server,
             headers={"Content-Type": "application/json"},
             iterof_messages=listof_convos,
-            generation_kwargs=params,
+            gen_kwargs=params,
             remote_call_concurrency=self.remote_call_concurrency,
             timeout_secs=self.timeout_secs,
+            metadatas=metadatas,
         )
         gen = to_synchronous_generator(agen)
         return gen
@@ -85,9 +87,9 @@ def to_vllm_oai_format(convo: Conversation) -> list[dict]:
 
         # Add image if present
         if msg.img is not None:
-            assert isinstance(
-                msg.img, (str, Path)
-            ), f"msg.img must be a string or Path, got {type(msg.img)}"
+            assert isinstance(msg.img, (str, Path)), (
+                f"msg.img must be a string or Path, got {type(msg.img)}"
+            )
             img_path = str(Path(msg.img).absolute())
             content.append(
                 {"type": "image_url", "image_url": {"url": f"file://{img_path}"}}
@@ -95,9 +97,9 @@ def to_vllm_oai_format(convo: Conversation) -> list[dict]:
 
         # Add video if present
         if msg.video is not None:
-            assert isinstance(
-                msg.video, (str, Path)
-            ), f"msg.video must be a string or Path, got {type(msg.video)}"
+            assert isinstance(msg.video, (str, Path)), (
+                f"msg.video must be a string or Path, got {type(msg.video)}"
+            )
             video_path = str(Path(msg.video).absolute())
             content.append(
                 {"type": "video_url", "video_url": {"url": f"file://{video_path}"}}
@@ -133,7 +135,7 @@ def to_vllm_oai_format(convo: Conversation) -> list[dict]:
 
 
 def dump_dataset_as_batch_request(
-    dataset: list[Conversation], model_id: str, tgt_jsonl: Path, **generation_kwargs
+    dataset: list[Conversation], model_id: str, tgt_jsonl: Path, **gen_kwargs
 ):
     entries = []
     for idx, convo in enumerate(dataset):
@@ -142,7 +144,7 @@ def dump_dataset_as_batch_request(
             oai_format,
             model_id=model_id,
             custom_id=str(idx),
-            **generation_kwargs,
+            **gen_kwargs,
         )
         entries.append(entry)
     df = pd.DataFrame(entries)
