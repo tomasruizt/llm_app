@@ -22,6 +22,7 @@ class ModelvLLM(BaseLLM):
     temperature: float = 0
     remote_call_concurrency: int = 8
     port: int = 8000
+    timeout_secs: int = 120
 
     def complete_msgs(
         self, msgs: Conversation, output_dict: bool = False, **generate_kwargs
@@ -54,6 +55,7 @@ class ModelvLLM(BaseLLM):
             iterof_messages=listof_convos,
             generation_kwargs=params,
             remote_call_concurrency=self.remote_call_concurrency,
+            timeout_secs=self.timeout_secs,
         )
         gen = to_synchronous_generator(agen)
         return gen
@@ -83,9 +85,9 @@ def to_vllm_oai_format(convo: Conversation) -> list[dict]:
 
         # Add image if present
         if msg.img is not None:
-            assert isinstance(msg.img, (str, Path)), (
-                f"msg.img must be a string or Path, got {type(msg.img)}"
-            )
+            assert isinstance(
+                msg.img, (str, Path)
+            ), f"msg.img must be a string or Path, got {type(msg.img)}"
             img_path = str(Path(msg.img).absolute())
             content.append(
                 {"type": "image_url", "image_url": {"url": f"file://{img_path}"}}
@@ -93,9 +95,9 @@ def to_vllm_oai_format(convo: Conversation) -> list[dict]:
 
         # Add video if present
         if msg.video is not None:
-            assert isinstance(msg.video, (str, Path)), (
-                f"msg.video must be a string or Path, got {type(msg.video)}"
-            )
+            assert isinstance(
+                msg.video, (str, Path)
+            ), f"msg.video must be a string or Path, got {type(msg.video)}"
             video_path = str(Path(msg.video).absolute())
             content.append(
                 {"type": "video_url", "video_url": {"url": f"file://{video_path}"}}

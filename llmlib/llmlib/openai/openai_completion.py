@@ -121,11 +121,13 @@ async def _batch_call_openai(
     iterof_messages: Iterable[list[dict]],
     generation_kwargs: dict,
     remote_call_concurrency: int,
+    timeout_secs: int = 60,
 ) -> AsyncGenerator[dict, None]:
     semaphore = asyncio.Semaphore(remote_call_concurrency)
 
     tasks = []
-    async with aiohttp.ClientSession() as session:
+    timeout = aiohttp.ClientTimeout(total=timeout_secs)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         for request_idx, messages in enumerate(iterof_messages):
             post_kwargs = {
                 "url": f"{base_url}/chat/completions",
@@ -156,11 +158,10 @@ async def _call_openai(
             async with session.post(**post_kwargs) as response:
                 response.raise_for_status()
                 completion = await response.json()
-
-                asdict = as_dict(completion)
-                asdict["request_idx"] = request_idx
-                asdict["success"] = True
-                return asdict
+            asdict = as_dict(completion)
+            asdict["request_idx"] = request_idx
+            asdict["success"] = True
+            return asdict
 
         except Exception as e:
             logger.error(
