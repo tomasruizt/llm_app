@@ -123,11 +123,10 @@ async def _batch_call_openai(
     remote_call_concurrency: int,
     timeout_secs: int = 60,
 ) -> AsyncGenerator[dict, None]:
-    semaphore = asyncio.Semaphore(remote_call_concurrency)
-
     tasks = []
     timeout = aiohttp.ClientTimeout(total=timeout_secs)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
+    connector = aiohttp.TCPConnector(limit=remote_call_concurrency)
+    async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
         for request_idx, messages in enumerate(iterof_messages):
             post_kwargs = {
                 "url": f"{base_url}/chat/completions",
@@ -138,7 +137,6 @@ async def _batch_call_openai(
                 session=session,
                 post_kwargs=post_kwargs,
                 request_idx=request_idx,
-                semaphore=semaphore,
             )
             tasks.append(coro)
 
@@ -150,23 +148,21 @@ async def _call_openai(
     session: aiohttp.ClientSession,
     post_kwargs: dict,
     request_idx: int,
-    semaphore: asyncio.Semaphore,
 ) -> dict:
-    async with semaphore:
-        logger.debug("Calling OpenAI API for request %d", request_idx)
-        try:
-            async with session.post(**post_kwargs) as response:
-                response.raise_for_status()
-                completion = await response.json()
-            asdict = as_dict(completion)
-            asdict["request_idx"] = request_idx
-            asdict["success"] = True
-            return asdict
+    logger.debug("Calling OpenAI API for request %d", request_idx)
+    try:
+        async with session.post(**post_kwargs) as response:
+            response.raise_for_status()
+            completion = await response.json()
+        asdict = as_dict(completion)
+        asdict["request_idx"] = request_idx
+        asdict["success"] = True
+        return asdict
 
-        except Exception as e:
-            logger.error(
-                "Error calling OpenAI API for request %d. Cause: %s",
-                request_idx,
-                repr(e),
-            )
-            return {"request_idx": request_idx, "error": str(e), "success": False}
+    except Exception as e:
+        logger.error(
+            "Error calling OpenAI API for request %d. Cause: %s",
+            request_idx,
+            repr(e),
+        )
+        return {"request_idx": request_idx, "error": str(e), "success": False}
