@@ -151,7 +151,7 @@ async def _call_openai(
     semaphore: asyncio.Semaphore,
 ) -> dict:
     async with semaphore:
-        logger.info("Calling OpenAI API for request %d", request_idx)
+        logger.debug("Calling OpenAI API for request %d", request_idx)
         try:
             async with session.post(**post_kwargs) as response:
                 response.raise_for_status()
