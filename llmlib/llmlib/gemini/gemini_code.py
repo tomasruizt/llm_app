@@ -355,7 +355,9 @@ class GeminiAPI(LLM):
     requires_gpu_exclusively = False
     model_ids = available_models
 
-    def complete_msgs(self, msgs: list[Message], **kwargs) -> str:
+    def complete_msgs(
+        self, msgs: list[Message], output_dict: bool = False, **kwargs
+    ) -> str:
         req = self._multiturn_req(msgs=msgs, **kwargs)
         return req.fetch_media_description()
 
