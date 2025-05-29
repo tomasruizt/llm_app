@@ -43,7 +43,7 @@ def test_gemini_location():
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
-def test_gemini_json_schema():
+def test_gemini_can_output_json_schema():
     model = GeminiAPI()
     assert_model_can_output_json_schema(model)
 

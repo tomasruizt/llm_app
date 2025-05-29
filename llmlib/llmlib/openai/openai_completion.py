@@ -35,20 +35,23 @@ class OpenAIModel(LLM):
     model_ids = [_default_model, "gpt-4o"]
 
     def complete_msgs(
-        self, msgs: Conversation, output_dict: bool = False
+        self, msgs: Conversation, output_dict: bool = False, **kwargs
     ) -> str | dict:
-        for data in self.complete_batch([msgs]):
+        for data in self.complete_batch([msgs], **kwargs):
             pass  # avoid RuntimeError: async generator ignored GeneratorExit
         if not output_dict:
             return data["response"]
         return data
 
     def complete_batch(
-        self, batch: Iterable[Conversation], metadatas: Iterable[dict] | None = None
+        self,
+        batch: Iterable[Conversation],
+        metadatas: Iterable[dict] | None = None,
+        **gen_kwargs,
     ) -> Iterable[dict]:
         listof_convos = (extract_msgs(convo) for convo in batch)
 
-        gen_kwargs = {"model": self.model_id, "temperature": 0.0}
+        gen_kwargs = {"model": self.model_id, "temperature": 0.0} | gen_kwargs
         gen_kwargs = gen_kwargs | self.generation_kwargs
 
         agen: AsyncGenerator[dict, None] = _batch_call_openai(
@@ -131,6 +134,8 @@ async def _batch_call_openai(
     if metadatas is None:
         metadatas = cycle([{}])
 
+    json_schema = gen_kwargs.pop("json_schema", None)
+
     tasks = []
     timeout = aiohttp.ClientTimeout(sock_connect=timeout_secs, sock_read=timeout_secs)
     connector = aiohttp.TCPConnector(limit=remote_call_concurrency)
@@ -143,6 +148,14 @@ async def _batch_call_openai(
                 "headers": headers,
                 "json": {**gen_kwargs, "messages": messages},
             }
+            if json_schema is not None:
+                post_kwargs["json"]["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": json_schema.__name__,
+                        "schema": json_schema.model_json_schema(),
+                    },
+                }
             metadata = metadata | {"request_idx": request_idx}
             coro = _call_openai(
                 session=session,
@@ -164,6 +177,12 @@ async def _call_openai(
     logger.debug("Calling OpenAI API for request %d", request_idx)
     try:
         async with session.post(**post_kwargs) as response:
+            if response.status != 200:
+                logger.error(
+                    "OpenAI API returned status %d, text: %s",
+                    response.status,
+                    await response.text(),
+                )
             response.raise_for_status()
             completion = await response.json()
         asdict = as_dict(completion) | metadata

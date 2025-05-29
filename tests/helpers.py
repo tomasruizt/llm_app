@@ -268,9 +268,11 @@ def assert_model_can_output_json_schema(model: LLM):
         name: str
         age: int
 
+    class Group(BaseModel):
+        people: list[Person]
+
     convo = [Message.from_prompt(prompt="Output a list of 3 people")]
-    response: str = model.complete_msgs(msgs=convo, json_schema=list[Person])
-    persons = json.loads(response)
-    assert len(persons) == 3
-    for person in persons:
-        Person.model_validate(person)  # raises exception if not valid
+    response: str = model.complete_msgs(msgs=convo, json_schema=Group)
+    group = json.loads(response)
+    assert Group.model_validate(group)
+    assert len(group["people"]) == 3

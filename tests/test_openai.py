@@ -11,6 +11,7 @@ from deepdiff import DeepDiff
 
 from .helpers import (
     assert_model_can_answer_batch_of_text_prompts,
+    assert_model_can_output_json_schema,
     assert_model_knows_capital_of_france,
     assert_model_recognizes_pyramid_in_image,
     assert_model_returns_passed_metadata,
@@ -69,3 +70,8 @@ def test_openai_can_answer_batch_of_text_prompts():
 def test_openai_returns_passed_metadata():
     model: LLM = OpenAIModel()
     assert_model_returns_passed_metadata(model)
+
+
+def test_openai_can_output_json_schema():
+    model: LLM = OpenAIModel()
+    assert_model_can_output_json_schema(model)
