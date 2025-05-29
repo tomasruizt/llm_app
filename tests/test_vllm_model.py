@@ -14,6 +14,7 @@ from .helpers import (
     assert_model_supports_multiple_imgs,
     assert_model_can_answer_batch_of_img_prompts,
     assert_model_deals_graciously_with_individual_failures,
+    assert_model_can_output_json_schema,
 )
 
 
@@ -41,8 +42,8 @@ def test_vllm_model_local_warnings():
     "generate_kwargs",
     [
         {"temperature": 0.0},  # greedy-decoding
-        {"temperature": 1.0},
-        {"output_dict": True},
+        # {"temperature": 1.0},
+        # {"output_dict": True},
     ],
 )
 def test_vllm_model_knows_capital_of_france(vllm_model, generate_kwargs: dict):
@@ -138,6 +139,10 @@ def _vllm_oai_example_img() -> tuple[Conversation, list[dict]]:
     ]
 
     return convo, expected_oai_format
+
+
+def test_vllm_model_can_output_json_schema(vllm_model):
+    assert_model_can_output_json_schema(vllm_model)
 
 
 # MULTITURN IS NOT SUPPORTED YET

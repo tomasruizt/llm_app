@@ -45,7 +45,7 @@ def test_gemini_knows_capital_of_france():
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_gemini_can_output_json_schema():
     model = GeminiAPI()
-    assert_model_can_output_json_schema(model)
+    assert_model_can_output_json_schema(model, check_batch_mode=False)
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")

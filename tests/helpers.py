@@ -263,7 +263,7 @@ def decode_base64_to_array(base64_str: str) -> np.ndarray:
     return image
 
 
-def assert_model_can_output_json_schema(model: LLM):
+def assert_model_can_output_json_schema(model: LLM, check_batch_mode: bool = True):
     class Person(BaseModel):
         name: str
         age: int
@@ -272,7 +272,15 @@ def assert_model_can_output_json_schema(model: LLM):
         people: list[Person]
 
     convo = [Message.from_prompt(prompt="Output a list of 3 people")]
-    response: str = model.complete_msgs(msgs=convo, json_schema=Group)
-    group = json.loads(response)
-    assert Group.model_validate(group)
-    assert len(group["people"]) == 3
+    r1: str = model.complete_msgs(msgs=convo, json_schema=Group)
+    group1 = json.loads(r1)
+    assert Group.model_validate(group1)
+    assert len(group1["people"]) == 3
+    if not check_batch_mode:
+        return
+
+    responses = list(model.complete_batch(batch=[convo], json_schema=Group))
+    r2: str = responses[0]["response"]
+    group2 = json.loads(r2)
+    assert Group.model_validate(group2)
+    assert len(group2["people"]) == 3
