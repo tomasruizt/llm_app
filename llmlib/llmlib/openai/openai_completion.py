@@ -132,7 +132,7 @@ async def _batch_call_openai(
         metadatas = cycle([{}])
 
     tasks = []
-    timeout = aiohttp.ClientTimeout(total=timeout_secs)
+    timeout = aiohttp.ClientTimeout(sock_connect=timeout_secs, sock_read=timeout_secs)
     connector = aiohttp.TCPConnector(limit=remote_call_concurrency)
     async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
         for request_idx, (messages, metadata) in enumerate(
