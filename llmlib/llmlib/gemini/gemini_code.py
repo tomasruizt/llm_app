@@ -351,20 +351,19 @@ class GeminiAPI(LLM):
     delete_files_after_use: bool = True
     safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
     location: str = default_location  # https://cloud.google.com/about/locations#europe
-    json_schema: type[BaseModel] | None = None
 
     requires_gpu_exclusively = False
     model_ids = available_models
 
-    def complete_msgs(self, msgs: list[Message]) -> str:
-        req = self._multiturn_req(msgs=msgs)
+    def complete_msgs(self, msgs: list[Message], **kwargs) -> str:
+        req = self._multiturn_req(msgs=msgs, **kwargs)
         return req.fetch_media_description()
 
     def video_prompt(self, video: Path | BytesIO, prompt: str) -> str:
         msgs = [Message(role="user", msg=prompt, video=video)]
         return self.complete_msgs(msgs=msgs)
 
-    def _multiturn_req(self, msgs: list[Message]) -> MultiTurnRequest:
+    def _multiturn_req(self, msgs: list[Message], **kwargs) -> MultiTurnRequest:
         delete_files_after_use = self.delete_files_after_use
         if self.use_context_caching:
             delete_files_after_use = False
@@ -376,7 +375,7 @@ class GeminiAPI(LLM):
             delete_files_after_use=delete_files_after_use,
             use_context_caching=self.use_context_caching,
             location=self.location,
-            json_schema=self.json_schema,
+            **kwargs,
         )
         return req
 

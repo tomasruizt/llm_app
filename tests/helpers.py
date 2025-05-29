@@ -1,10 +1,12 @@
 import base64
+import json
 import os
 from pathlib import Path
 import PIL
 import cv2
 from llmlib.base_llm import LLM, Message
 import numpy as np
+from pydantic import BaseModel
 import pytest
 
 
@@ -259,3 +261,16 @@ def decode_base64_to_array(base64_str: str) -> np.ndarray:
     np_array = np.frombuffer(image_data, np.uint8)
     image = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
     return image
+
+
+def assert_model_can_output_json_schema(model: LLM):
+    class Person(BaseModel):
+        name: str
+        age: int
+
+    convo = [Message.from_prompt(prompt="Output a list of 3 people")]
+    response: str = model.complete_msgs(msgs=convo, json_schema=list[Person])
+    persons = json.loads(response)
+    assert len(persons) == 3
+    for person in persons:
+        Person.model_validate(person)  # raises exception if not valid
