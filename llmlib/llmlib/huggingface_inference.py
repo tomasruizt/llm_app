@@ -60,32 +60,84 @@ def convert_message_to_openai_format(
 
 
 @ttl_cache(ttl=10 * 60)  # 10 minutes
-def video_to_imgs(video_path: Path | str, max_n_frames: int) -> list[PIL.Image.Image]:
-    """From https://github.com/agustoslu/simple-inference-benchmark/blob/5cec55787d34af65f0d11efc429c3d4de92f051a/utils.py#L79"""
-    if isinstance(video_path, str):
-        video_path = Path(video_path)
-    assert isinstance(video_path, Path), video_path
-    assert video_path.exists(), video_path
+# def video_to_imgs(video_path: Path | str | list[Path], max_n_frames: int) -> list[PIL.Image.Image]:
+#     """From https://github.com/agustoslu/simple-inference-benchmark/blob/5cec55787d34af65f0d11efc429c3d4de92f051a/utils.py#L79"""
+#     if isinstance(video_path, str):
+#         video_path = Path(video_path)
+#     assert isinstance(video_path, Path), video_path
+#     assert video_path.exists(), video_path
+
+#     if is_img(video_path):
+#         imgs = []
+#         img = Image.open(video_path).convert("RGB")
+#         imgs.append(img)
+#     logger.info(f"Extracted {len(imgs)} frame from slides {video_path.name}")
+#     return imgs
+    
+#     cap = cv2.VideoCapture(str(video_path))
+#     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+#     fps = int(cap.get(cv2.CAP_PROP_FPS))
+
+#     frame_indices = compute_frame_indices(
+#         vid_n_frames=total_frames, vid_fps=fps, max_n_frames=max_n_frames
+#     )
+
+#     frames = []
+#     for frame_idx in frame_indices:
+#         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+#         success, frame = cap.read()
+#         if success:
+#             # Convert BGR (the default format for OpenCV) to RGB
+#             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+#             frames.append(Image.fromarray(frame_rgb))
+
+#     cap.release()
+#     logger.info(f"Extracted {len(frames)} frames from video {video_path.name}")
+#     return frames
+
+def video_to_imgs(video_path: Path | str | list, max_n_frames: int = 30) -> list[PIL.Image.Image]:
+    """
+    Handles:
+    - list of image Paths (slides)
+    - single image Path
+    - video Path
+    """
+    from PIL import Image
+    import cv2
+
+    # Slides: list of image paths
+    if isinstance(video_path, list):
+        imgs = []
+        for img_path in sorted(video_path):
+            img = Image.open(img_path).convert("RGB")
+            imgs.append(img)
+            if len(imgs) >= max_n_frames:
+                break
+        return imgs
+
+    # Single image
+    if is_img(video_path):
+        img = Image.open(video_path).convert("RGB")
+        return [img]
+
+    # Video
     cap = cv2.VideoCapture(str(video_path))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-
     frame_indices = compute_frame_indices(
         vid_n_frames=total_frames, vid_fps=fps, max_n_frames=max_n_frames
     )
-
     frames = []
     for frame_idx in frame_indices:
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
         success, frame = cap.read()
         if success:
-            # Convert BGR (the default format for OpenCV) to RGB
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frames.append(Image.fromarray(frame_rgb))
-
     cap.release()
-    logger.info(f"Extracted {len(frames)} frames from video {video_path.name}")
+    logger.info(f"Extracted {len(frames)} frames from video {getattr(video_path, 'name', video_path)}")
     return frames
+
 
 
 def compute_frame_indices(vid_n_frames: int, vid_fps: float, max_n_frames: int):
@@ -119,6 +171,33 @@ def is_img(file_path: str | Path) -> bool:
 def is_video(file_path: str | Path) -> bool:
     permitted = (".mp4",)
     return str(file_path).lower().endswith(permitted)
+
+# def slides_to_imgs(path: str | Path, max_n_frames: int = 30) -> list[PIL.Image.Image]:
+#     path = Path(path)
+#     imgs = []
+#     if path.is_dir():
+#         for img_path in sorted(path.glob("*")):
+#             if is_img(img_path):
+#                 img = Image.open(img_path).convert("RGB")
+#                 imgs.append(img)
+#                 if len(imgs) >= max_n_frames:
+#                     break
+#     elif is_img(path):
+#         img = Image.open(path).convert("RGB")
+#         imgs.append(img)
+#     else:
+#         raise ValueError(f"Unsupported path type for slides: {path}")
+#     return imgs
+
+# def media_to_imgs(path: str | Path, max_n_frames: int) -> list[PIL.Image.Image]:
+#     path = Path(path)
+#     breakpoint()
+#     if path.is_dir() or path.is_img():
+#         return slides_to_imgs(path, max_n_frames=max_n_frames)
+#     elif path.is_video():
+#         return video_to_imgs(path, max_n_frames=max_n_frames)
+#     else:
+#         raise ValueError(f"Unsupported media type: {path}")
 
 
 def extract_content_piece(img: PIL.Image.Image | str | Path) -> dict:
