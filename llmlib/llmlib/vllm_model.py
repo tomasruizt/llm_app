@@ -1,8 +1,9 @@
+from itertools import cycle
 from pathlib import Path
 from typing import Any, Iterable
 import pandas as pd
 from dataclasses import dataclass
-from llmlib.base_llm import LLM as BaseLLM, Conversation
+from llmlib.base_llm import LLM as BaseLLM, Conversation, LlmReq
 from llmlib.huggingface_inference import is_img, is_video
 import logging
 from .openai.openai_completion import (
@@ -40,7 +41,8 @@ class ModelvLLM(BaseLLM):
         metadatas: Iterable[dict] | None = None,
         **generate_kwargs,
     ) -> Iterable[dict]:
-        listof_convos = (to_vllm_oai_format(convo) for convo in batch)
+        if metadatas is None:
+            metadatas = cycle([{}])
 
         params = dict(
             model=self.model_id,
@@ -49,15 +51,31 @@ class ModelvLLM(BaseLLM):
         )
         params = params | generate_kwargs
 
-        server = f"http://localhost:{self.port}/v1"
+        new_batch = [
+            LlmReq(convo=convo, gen_kwargs=params, metadata=md)
+            for convo, md in zip(batch, metadatas)
+        ]
+        return self.complete_batchof_reqs(new_batch)
+
+    def complete_batchof_reqs(self, batch: Iterable[LlmReq]) -> Iterable[dict]:
+        fixed_gen_kwargs = dict(
+            model=self.model_id,
+            temperature=self.temperature,
+            max_tokens=self.max_new_tokens,
+        )
+        new_batch = [
+            req.replace(
+                gen_kwargs=fixed_gen_kwargs | req.gen_kwargs,
+                messages=to_vllm_oai_format(req.convo),
+            )
+            for req in batch
+        ]
         agen = _batch_call_openai(
-            base_url=server,
+            base_url=f"http://localhost:{self.port}/v1",
             headers={"Content-Type": "application/json"},
-            iterof_messages=listof_convos,
-            gen_kwargs=params,
+            batch=new_batch,
             remote_call_concurrency=self.remote_call_concurrency,
             timeout_secs=self.timeout_secs,
-            metadatas=metadatas,
         )
         gen = to_synchronous_generator(agen)
         return gen

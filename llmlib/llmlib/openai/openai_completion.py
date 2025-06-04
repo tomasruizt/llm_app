@@ -5,7 +5,7 @@ import os
 from typing import Generator, Iterable, AsyncGenerator
 import aiohttp
 import asyncio
-from ..base_llm import LLM, Conversation, Message
+from ..base_llm import LLM, LlmReq, Conversation, Message
 from ..rest_api.restapi_client import encode_as_png_in_base64
 
 logger = logging.getLogger(__name__)
@@ -49,18 +49,27 @@ class OpenAIModel(LLM):
         metadatas: Iterable[dict] | None = None,
         **gen_kwargs,
     ) -> Iterable[dict]:
-        listof_convos = (extract_msgs(convo) for convo in batch)
+        if metadatas is None:
+            metadatas = cycle([{}])
 
         gen_kwargs = {"model": self.model_id, "temperature": 0.0} | gen_kwargs
         gen_kwargs = gen_kwargs | self.generation_kwargs
 
+        new_batch = [
+            LlmReq(
+                convo=convo,
+                messages=extract_msgs(convo),
+                gen_kwargs=gen_kwargs,
+                metadata=md,
+            )
+            for convo, md in zip(batch, metadatas)
+        ]
+
         agen: AsyncGenerator[dict, None] = _batch_call_openai(
             base_url=self.base_url,
             headers=self.headers(),
-            iterof_messages=listof_convos,
-            metadatas=metadatas,
+            batch=new_batch,
             remote_call_concurrency=self.remote_call_concurrency,
-            gen_kwargs=gen_kwargs,
         )
         gen = to_synchronous_generator(agen)
         return gen
@@ -125,28 +134,20 @@ def config_for_cerebras_on_openrouter() -> dict:
 async def _batch_call_openai(
     base_url: str,
     headers: dict,
-    iterof_messages: Iterable[list[dict]],
-    gen_kwargs: dict,
+    batch: Iterable[LlmReq],
     remote_call_concurrency: int,
     timeout_secs: int = 60,
-    metadatas: Iterable[dict] | None = None,
 ) -> AsyncGenerator[dict, None]:
-    if metadatas is None:
-        metadatas = cycle([{}])
-
-    json_schema = gen_kwargs.pop("json_schema", None)
-
     tasks = []
     timeout = aiohttp.ClientTimeout(sock_connect=timeout_secs, sock_read=timeout_secs)
     connector = aiohttp.TCPConnector(limit=remote_call_concurrency)
     async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
-        for request_idx, (messages, metadata) in enumerate(
-            zip(iterof_messages, metadatas)
-        ):
+        for request_idx, req in enumerate(batch):
+            json_schema = req.gen_kwargs.pop("json_schema", None)
             post_kwargs = {
                 "url": f"{base_url}/chat/completions",
                 "headers": headers,
-                "json": {**gen_kwargs, "messages": messages},
+                "json": {**req.gen_kwargs, "messages": req.messages},
             }
             if json_schema is not None:
                 post_kwargs["json"]["response_format"] = {
@@ -156,7 +157,7 @@ async def _batch_call_openai(
                         "schema": json_schema.model_json_schema(),
                     },
                 }
-            metadata = metadata | {"request_idx": request_idx}
+            metadata = req.metadata | {"request_idx": request_idx} | req.gen_kwargs
             coro = _call_openai(
                 session=session,
                 post_kwargs=post_kwargs,

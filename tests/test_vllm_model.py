@@ -15,6 +15,7 @@ from .helpers import (
     assert_model_can_answer_batch_of_img_prompts,
     assert_model_deals_graciously_with_individual_failures,
     assert_model_can_output_json_schema,
+    assert_model_can_use_multiple_gen_kwargs,
 )
 
 
@@ -68,6 +69,11 @@ def test_vllm_model_can_answer_batch_of_img_prompts(vllm_model):
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_vllm_model_deals_graciously_with_individual_failures(vllm_model):
     assert_model_deals_graciously_with_individual_failures(vllm_model)
+
+
+@pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
+def test_vllm_model_can_use_multiple_gen_kwargs(vllm_model):
+    assert_model_can_use_multiple_gen_kwargs(vllm_model)
 
 
 def test_vllm_model_format_case1():

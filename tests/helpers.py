@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import PIL
 import cv2
-from llmlib.base_llm import LLM, Message
+from llmlib.base_llm import LLM, Message, LlmReq
 import numpy as np
 from pydantic import BaseModel
 import pytest
@@ -290,3 +290,21 @@ def assert_model_can_output_json_schema(model: LLM, check_batch_mode: bool = Tru
     group2 = json.loads(r2)
     assert Group.model_validate(group2)
     assert len(group2["people"]) == 3
+
+
+def assert_model_can_use_multiple_gen_kwargs(model: LLM):
+    req1 = LlmReq(
+        convo=[Message.from_prompt(prompt="Whats the capital of France?")],
+        gen_kwargs={"temperature": 0.5},
+    )
+    req2 = LlmReq(
+        convo=[Message.from_prompt(prompt="Whats the capital of Germany?")],
+        gen_kwargs={"temperature": 0.8},
+    )
+    responses = model.complete_batchof_reqs(batch=[req1, req2])
+    r1, r2 = list(sorted(responses, key=lambda r: r["request_idx"]))
+
+    assert "temperature" in r1, r1
+    assert r1["temperature"] == 0.5, r1["temperature"]
+    assert "temperature" in r2, r2
+    assert r2["temperature"] == 0.8, r2["temperature"]

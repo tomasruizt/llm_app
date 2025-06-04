@@ -10,4 +10,5 @@ vllm-server:
 		--limit-mm-per-prompt "image=50,video=2" \
 		--disable-log-requests \
 		--port 8000 \
-		--gpu-memory-utilization 0.8
+		--gpu-memory-utilization 0.8 \
+		--enforce-eager
