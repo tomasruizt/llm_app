@@ -45,7 +45,7 @@ class ModelvLLM(BaseLLM):
             metadatas = cycle([{}])
 
         params = dict(
-            model=self.model_id,
+            model_id=self.model_id,
             temperature=self.temperature,
             max_tokens=self.max_new_tokens,
         )
@@ -59,7 +59,7 @@ class ModelvLLM(BaseLLM):
 
     def complete_batchof_reqs(self, batch: Iterable[LlmReq]) -> Iterable[dict]:
         fixed_gen_kwargs = dict(
-            model=self.model_id,
+            model_id=self.model_id,
             temperature=self.temperature,
             max_tokens=self.max_new_tokens,
         )
