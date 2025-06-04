@@ -195,4 +195,5 @@ async def _call_openai(
             request_idx,
             repr(e),
         )
-        return {"request_idx": request_idx, "error": str(e), "success": False}
+        asdict = {"request_idx": request_idx, "error": str(e), "success": False}
+        return asdict | metadata

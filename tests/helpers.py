@@ -89,7 +89,8 @@ def assert_model_deals_graciously_with_individual_failures(model: LLM) -> None:
         [non_existing_file_message()],
         [forest_message()],
     ]
-    responses = model.complete_batch(batch=batch)
+    metadatas = [{"key": 2}, {"key": 1}, {"key": 3}]
+    responses = model.complete_batch(batch=batch, metadatas=metadatas)
     responses = sorted(responses, key=lambda r: r["request_idx"])
     ok_response, fail_response, ok_response2 = responses
     assert ok_response["success"]
@@ -97,6 +98,11 @@ def assert_model_deals_graciously_with_individual_failures(model: LLM) -> None:
 
     assert not fail_response["success"]
     assert fail_response["error"] is not None
+
+    expected_metadata_vals = [m["key"] for m in metadatas]
+    for r, expected_val in zip(responses, expected_metadata_vals):
+        assert "key" in r, r
+        assert r["key"] == expected_val, r["key"]
 
 
 def assert_model_rejects_unsupported_batches(model: LLM) -> None:
