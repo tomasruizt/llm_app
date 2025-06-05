@@ -26,9 +26,9 @@ class ModelvLLM(BaseLLM):
     timeout_secs: int = 120
 
     def complete_msgs(
-        self, msgs: Conversation, output_dict: bool = False, **generate_kwargs
+        self, msgs: Conversation, output_dict: bool = False, **gen_kwargs
     ) -> str | dict:
-        for result in self.complete_batch([msgs], **generate_kwargs):
+        for result in self.complete_batch([msgs], **gen_kwargs):
             pass  # Avoid RuntimeError: async generator ignored GeneratorExit
         if output_dict:
             return result
@@ -39,27 +39,20 @@ class ModelvLLM(BaseLLM):
         self,
         batch: Iterable[Conversation],
         metadatas: Iterable[dict] | None = None,
-        **generate_kwargs,
+        **gen_kwargs,
     ) -> Iterable[dict]:
         if metadatas is None:
             metadatas = cycle([{}])
 
-        params = dict(
-            model_id=self.model_id,
-            temperature=self.temperature,
-            max_tokens=self.max_new_tokens,
-        )
-        params = params | generate_kwargs
-
         new_batch = [
-            LlmReq(convo=convo, gen_kwargs=params, metadata=md)
+            LlmReq(convo=convo, gen_kwargs=gen_kwargs, metadata=md)
             for convo, md in zip(batch, metadatas)
         ]
         return self.complete_batchof_reqs(new_batch)
 
     def complete_batchof_reqs(self, batch: Iterable[LlmReq]) -> Iterable[dict]:
         fixed_gen_kwargs = dict(
-            model_id=self.model_id,
+            model=self.model_id,
             temperature=self.temperature,
             max_tokens=self.max_new_tokens,
         )
