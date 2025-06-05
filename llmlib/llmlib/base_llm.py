@@ -50,12 +50,12 @@ class LLM:
     requires_gpu_exclusively: bool = False
 
     def complete_msgs(
-        self, msgs: Conversation, output_dict: bool = False, **generate_kwargs
+        self, msgs: Conversation, output_dict: bool = False, **gen_kwargs
     ) -> str | dict:
         raise NotImplementedError
 
     def complete_batch(
-        self, batch: Iterable[Conversation], **generate_kwargs
+        self, batch: Iterable[Conversation], **gen_kwargs
     ) -> Iterable[dict]:
         raise NotImplementedError
 
