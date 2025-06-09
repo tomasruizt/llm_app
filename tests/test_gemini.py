@@ -38,9 +38,10 @@ def test_gemini_vision_using_interface():
 def test_gemini_knows_capital_of_france():
     model = GeminiAPI(
         model_id=GeminiModels.gemini_25_pro,
-        location="us-central1",
+        location="global",
+        include_thoughts=True,
     )
-    assert_model_knows_capital_of_france(model)
+    assert_model_knows_capital_of_france(model, check_thoughts=True, output_dict=True)
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")

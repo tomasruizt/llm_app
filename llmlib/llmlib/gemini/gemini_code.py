@@ -21,6 +21,7 @@ from google.genai.types import (
     HttpOptions,
     CreateCachedContentConfig,
     CachedContent,
+    ThinkingConfig,
 )
 import cv2
 import os
@@ -59,7 +60,7 @@ class GeminiModels(StrEnum):
     https://cloud.google.com/vertex-ai/generative-ai/docs/context-cache/context-cache-overview#supported_models
     """
 
-    gemini_25_pro = "gemini-2.5-pro-preview-03-25"
+    gemini_25_pro = "gemini-2.5-pro-preview-06-05"
     default = gemini_25_flash = "gemini-2.5-flash-preview-04-17"
     gemini_20_flash = "gemini-2.0-flash-001"
     gemini_20_flash_lite = "gemini-2.0-flash-lite-001"
@@ -83,6 +84,7 @@ class MultiTurnRequest:
     location: str = default_location
     json_schema: type[BaseModel] | None = None
     output_dict: bool = False
+    include_thoughts: bool = False
 
     def fetch_media_description(self) -> str | dict:
         return _execute_multi_turn_req(self)
@@ -120,7 +122,13 @@ def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
     if not req.output_dict:
         return response.text
 
-    return {"response": response.text, **config}
+    data = {"response": response.text, **config}
+    reasonings = [p.text for p in response.candidates[0].content.parts if p.thought]
+    if len(reasonings) > 1:
+        logger.warning("Found %d reasoning parts. Expected 1.", len(reasonings))
+    if len(reasonings) > 0:
+        data["reasoning"] = reasonings[0]
+    return data
 
 
 def is_long_enough_to_cache(paths: list[Path]) -> bool:
@@ -202,6 +210,9 @@ def _call_gemini(
     if req.json_schema is not None:
         config["response_mime_type"] = "application/json"
         config["response_schema"] = req.json_schema
+
+    if req.include_thoughts:
+        config["thinking_config"] = ThinkingConfig(include_thoughts=True)
 
     if isinstance(cached_content, CachedContent):
         config["cached_content"] = cached_content.name
@@ -357,14 +368,17 @@ class GeminiAPI(LLM):
     safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
     location: str = default_location  # https://cloud.google.com/about/locations#europe
     max_n_batching_threads: int = 16
+    include_thoughts: bool = False
 
     requires_gpu_exclusively = False
     model_ids = available_models
 
     def complete_msgs(
-        self, msgs: list[Message], output_dict: bool = False, **kwargs
+        self, msgs: list[Message], output_dict: bool = False, **gen_kwargs
     ) -> str:
-        req = self._multiturn_req(msgs=msgs, **kwargs)
+        req = self._multiturn_req(
+            msgs=msgs, output_dict=output_dict, gen_kwargs=gen_kwargs
+        )
         return req.fetch_media_description()
 
     def video_prompt(self, video: Path | BytesIO, prompt: str) -> str:
@@ -382,6 +396,7 @@ class GeminiAPI(LLM):
             delete_files_after_use=delete_files_after_use,
             use_context_caching=self.use_context_caching,
             location=self.location,
+            include_thoughts=self.include_thoughts,
             **kwargs,
         )
         return req
