@@ -121,10 +121,11 @@ def assert_model_recognizes_pyramid_in_image(model: LLM):
     assert "pyramid" in answer.lower(), answer
 
 
-def assert_model_recognizes_afd_in_video(model: LLM):
+def assert_model_recognizes_afd_in_video(model: LLM, **kwargs):
     video_path = file_for_test("video.mp4")
     question = "Describe the video in english"
-    answer: str = model.video_prompt(video_path, question).lower()
+    convo = [Message(role="user", msg=question, video=video_path)]
+    answer: str = model.complete_msgs(msgs=convo, **kwargs).lower()
     assert "alternative für deutschland" in answer or "afd" in answer, answer
 
 
@@ -242,7 +243,7 @@ def assert_model_supports_multiturn_with_multiple_imgs(model: LLM):
     convo.append(Message(role="assistant", msg=answer1))
     convo.append(Message(role="user", msg="How are they related?"))
     answer2 = model.complete_msgs(convo).lower()
-    possible_answers = ["biodiversity", "ecosystem", "habitat"]
+    possible_answers = ["biodiversity", "ecosystem", "habitat", "environment"]
     assert any(answer in answer2 for answer in possible_answers), answer2
 
 

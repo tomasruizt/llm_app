@@ -220,18 +220,22 @@ def _call_gemini(
     response: GenerateContentResponse = client.models.generate_content(
         model=req.model_name, contents=contents, config=config
     )
-    logger.info("Token usage: %s", response.usage_metadata.to_json_dict())
+    token_usage = response.usage_metadata.to_json_dict()
+    logger.info("Token usage: %s", token_usage)
 
     if len(response.candidates) == 0:
         raise ResponseRefusedException(
             "No candidates in response. prompt_feedback='%s'" % response.prompt_feedback
         )
-    else:
-        logger.info("Finish reason: %s", response.candidates[0].finish_reason)
 
-    enum = type(response.candidates[0].finish_reason)
-    if response.candidates[0].finish_reason in {enum.SAFETY, enum.PROHIBITED_CONTENT}:
+    finish_reason = response.candidates[0].finish_reason
+    logger.info("Finish reason: %s", finish_reason)
+
+    enum = type(finish_reason)
+    if finish_reason in {enum.SAFETY, enum.PROHIBITED_CONTENT}:
         raise UnsafeResponseError(safety_ratings=response.candidates[0].safety_ratings)
+    if finish_reason == enum.MAX_TOKENS:
+        raise ValueError("Max tokens reached. Token usage: %s" % repr(token_usage))
 
     return response, config
 
@@ -362,7 +366,6 @@ class ResponseRefusedException(Exception):
 @dataclass
 class GeminiAPI(LLM):
     model_id: str = GeminiModels.default
-    max_output_tokens: int = 1000
     use_context_caching: bool = False
     delete_files_after_use: bool = True
     safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
@@ -374,10 +377,17 @@ class GeminiAPI(LLM):
     model_ids = available_models
 
     def complete_msgs(
-        self, msgs: list[Message], output_dict: bool = False, **gen_kwargs
+        self,
+        msgs: list[Message],
+        output_dict: bool = False,
+        json_schema: type[BaseModel] | None = None,
+        **gen_kwargs,
     ) -> str:
         req = self._multiturn_req(
-            msgs=msgs, output_dict=output_dict, gen_kwargs=gen_kwargs
+            msgs=msgs,
+            output_dict=output_dict,
+            gen_kwargs=gen_kwargs,
+            json_schema=json_schema,
         )
         return req.fetch_media_description()
 
