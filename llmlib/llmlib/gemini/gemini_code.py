@@ -3,12 +3,13 @@ Based on https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/video-
 """
 
 import pandas as pd
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from io import BytesIO
 import json
 from logging import getLogger
 from pathlib import Path
 from typing import Any, Iterable, TypeVar
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from google.cloud import storage
 from google.cloud.storage import transfer_manager
 from google.genai.types import (
@@ -75,8 +76,7 @@ available_models = list(GeminiModels)
 class MultiTurnRequest:
     messages: list[Message]
     model_name: GeminiModels = GeminiModels.default
-    temperature: float = 0.0
-    max_output_tokens: int = 1000
+    gen_kwargs: dict[str, Any] = field(default_factory=dict)
     safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
     delete_files_after_use: bool = True
     use_context_caching: bool = False
@@ -193,11 +193,12 @@ def _call_gemini(
     cached_content: CachedContent | None = None,
 ) -> tuple[GenerateContentResponse, dict]:
     logger.info("Calling the Google API. model_name='%s'", req.model_name)
-    config = {
-        "temperature": req.temperature,
-        "max_output_tokens": req.max_output_tokens,
+    default_gen_kwargs = {
+        "max_output_tokens": 1000,
+        "temperature": 0.0,
         "safety_settings": safety_filters(req.safety_filter_threshold),
     }
+    config = default_gen_kwargs | req.gen_kwargs
     if req.json_schema is not None:
         config["response_mime_type"] = "application/json"
         config["response_schema"] = req.json_schema
@@ -355,6 +356,7 @@ class GeminiAPI(LLM):
     delete_files_after_use: bool = True
     safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
     location: str = default_location  # https://cloud.google.com/about/locations#europe
+    max_n_batching_threads: int = 16
 
     requires_gpu_exclusively = False
     model_ids = available_models
@@ -376,7 +378,6 @@ class GeminiAPI(LLM):
         req = MultiTurnRequest(
             messages=msgs,
             model_name=self.model_id,
-            max_output_tokens=self.max_output_tokens,
             safety_filter_threshold=self.safety_filter_threshold,
             delete_files_after_use=delete_files_after_use,
             use_context_caching=self.use_context_caching,
@@ -402,16 +403,26 @@ class GeminiAPI(LLM):
         return name
 
     def complete_batchof_reqs(self, batch: list[LlmReq]) -> Iterable[dict]:
-        for req_idx, req in enumerate(batch):
-            mt_req = self._multiturn_req(
-                msgs=req.convo, **req.gen_kwargs, output_dict=True
-            )
+        n_threads = min(len(batch), self.max_n_batching_threads)
+        with ThreadPoolExecutor(max_workers=n_threads) as executor:
+            futures = [
+                executor.submit(self._complete_single_llmreq, args)
+                for args in enumerate(batch)
+            ]
+            for future in as_completed(futures):
+                yield future.result()
+
+    def _complete_single_llmreq(self, args: tuple[int, LlmReq]) -> dict:
+        request_idx, req = args
+        try:
+            mt_kwargs = {"gen_kwargs": req.gen_kwargs, "output_dict": True}
+            mt_req = self._multiturn_req(msgs=req.convo, **mt_kwargs)
             data = mt_req.fetch_media_description()
-            data = data | {
-                "request_idx": req_idx,
-                **req.metadata,
-            }
-            yield data
+            data = data | {"request_idx": request_idx, **req.metadata}
+            return data
+        except Exception as e:
+            logger.error("Error processing request %d: %s", request_idx, e)
+            return {"request_idx": request_idx, "error": str(e), **req.metadata}
 
 
 def filepaths(msg: Message) -> list[Path]:
