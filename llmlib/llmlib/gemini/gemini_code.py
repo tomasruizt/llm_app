@@ -443,11 +443,16 @@ class GeminiAPI(LLM):
             mt_kwargs = {"gen_kwargs": req.gen_kwargs, "output_dict": True}
             mt_req = self._multiturn_req(msgs=req.convo, **mt_kwargs)
             data = mt_req.fetch_media_description()
-            data = data | {"request_idx": request_idx, **req.metadata}
+            data = data | {"success": True, "request_idx": request_idx, **req.metadata}
             return data
         except Exception as e:
             logger.error("Error processing request %d: %s", request_idx, e)
-            return {"request_idx": request_idx, "error": str(e), **req.metadata}
+            return {
+                "success": False,
+                "request_idx": request_idx,
+                "error": str(e),
+                **req.metadata,
+            }
 
 
 def filepaths(msg: Message) -> list[Path]:
