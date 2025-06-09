@@ -13,6 +13,7 @@ import pytest
 
 from tests.helpers import (
     assert_model_can_output_json_schema,
+    assert_model_can_use_multiple_gen_kwargs,
     assert_model_knows_capital_of_france,
     assert_model_recognizes_afd_in_video,
     assert_model_recognizes_pyramid_in_image,
@@ -115,6 +116,12 @@ def test_batch_mode_inference():
     tgt_dir = file_for_test("batch-gemini/")
     model.submit_batch_job(batch, tgt_dir=tgt_dir)
     assert Path(tgt_dir / "input.jsonl").exists()
+
+
+@pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
+def test_gemini_can_use_multiple_gen_kwargs():
+    model = GeminiAPI(model_id=GeminiModels.gemini_25_flash)
+    assert_model_can_use_multiple_gen_kwargs(model)
 
 
 def test_chunk():

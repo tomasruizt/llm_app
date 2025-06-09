@@ -8,7 +8,7 @@ from io import BytesIO
 import json
 from logging import getLogger
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, Iterable, TypeVar
 from google.cloud import storage
 from google.cloud.storage import transfer_manager
 from google.genai.types import (
@@ -28,7 +28,7 @@ import requests
 from tqdm import tqdm
 import google
 from strenum import StrEnum
-from ..base_llm import LLM, Message, validate_only_first_message_has_files
+from ..base_llm import LLM, Message, validate_only_first_message_has_files, LlmReq
 from ..error_handling import notify_bugsnag
 from pydantic import BaseModel
 
@@ -75,14 +75,16 @@ available_models = list(GeminiModels)
 class MultiTurnRequest:
     messages: list[Message]
     model_name: GeminiModels = GeminiModels.default
+    temperature: float = 0.0
     max_output_tokens: int = 1000
     safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
     delete_files_after_use: bool = True
     use_context_caching: bool = False
     location: str = default_location
     json_schema: type[BaseModel] | None = None
+    output_dict: bool = False
 
-    def fetch_media_description(self) -> str:
+    def fetch_media_description(self) -> str | dict:
         return _execute_multi_turn_req(self)
 
 
@@ -109,14 +111,16 @@ def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
         cached_content = None
 
     # Call Gemini
-    response: GenerateContentResponse = _call_gemini(
-        client, req, contents, cached_content
-    )
+    response, config = _call_gemini(client, req, contents, cached_content)
 
     # Cleanup
     if req.delete_files_after_use:
         delete_blobs(blobs)
-    return response.text
+
+    if not req.output_dict:
+        return response.text
+
+    return {"response": response.text, **config}
 
 
 def is_long_enough_to_cache(paths: list[Path]) -> bool:
@@ -187,10 +191,10 @@ def _call_gemini(
     req: MultiTurnRequest,
     contents: list[Part],
     cached_content: CachedContent | None = None,
-) -> GenerateContentResponse:
+) -> tuple[GenerateContentResponse, dict]:
     logger.info("Calling the Google API. model_name='%s'", req.model_name)
     config = {
-        "temperature": 0.0,
+        "temperature": req.temperature,
         "max_output_tokens": req.max_output_tokens,
         "safety_settings": safety_filters(req.safety_filter_threshold),
     }
@@ -217,7 +221,7 @@ def _call_gemini(
     if response.candidates[0].finish_reason in {enum.SAFETY, enum.PROHIBITED_CONTENT}:
         raise UnsafeResponseError(safety_ratings=response.candidates[0].safety_ratings)
 
-    return response
+    return response, config
 
 
 def create_client(location: str = default_location):
@@ -396,6 +400,18 @@ class GeminiAPI(LLM):
             location=self.location,
         )
         return name
+
+    def complete_batchof_reqs(self, batch: list[LlmReq]) -> Iterable[dict]:
+        for req_idx, req in enumerate(batch):
+            mt_req = self._multiturn_req(
+                msgs=req.convo, **req.gen_kwargs, output_dict=True
+            )
+            data = mt_req.fetch_media_description()
+            data = data | {
+                "request_idx": req_idx,
+                **req.metadata,
+            }
+            yield data
 
 
 def filepaths(msg: Message) -> list[Path]:
