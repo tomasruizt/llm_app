@@ -428,6 +428,8 @@ class GeminiAPI(LLM):
         return name
 
     def complete_batchof_reqs(self, batch: list[LlmReq]) -> Iterable[dict]:
+        if len(batch) == 0:
+            return []
         n_threads = min(len(batch), self.max_n_batching_threads)
         with ThreadPoolExecutor(max_workers=n_threads) as executor:
             futures = [
