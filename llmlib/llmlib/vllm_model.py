@@ -2,7 +2,7 @@ from itertools import cycle
 from pathlib import Path
 from typing import Any, Iterable
 import pandas as pd
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from llmlib.base_llm import LLM as BaseLLM, Conversation, LlmReq
 from llmlib.huggingface_inference import is_img, is_video
 import logging
@@ -23,6 +23,7 @@ class ModelvLLM(BaseLLM):
     temperature: float = 0
     remote_call_concurrency: int = 8
     port: int = 8000
+    more_ports: list[int] = field(default_factory=list)
     timeout_secs: int = 120
 
     def complete_msgs(
@@ -63,8 +64,9 @@ class ModelvLLM(BaseLLM):
             )
             for req in batch
         ]
+        base_urls = [f"http://localhost:{port}/v1" for port in self.all_ports()]
         agen = _batch_call_openai(
-            base_url=f"http://localhost:{self.port}/v1",
+            base_urls=base_urls,
             headers={"Content-Type": "application/json"},
             batch=new_batch,
             remote_call_concurrency=self.remote_call_concurrency,
@@ -72,6 +74,9 @@ class ModelvLLM(BaseLLM):
         )
         gen = to_synchronous_generator(agen)
         return gen
+
+    def all_ports(self) -> list[int]:
+        return [self.port] + self.more_ports
 
 
 def to_vllm_oai_format(convo: Conversation) -> list[dict]:

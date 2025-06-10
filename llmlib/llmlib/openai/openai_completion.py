@@ -66,7 +66,7 @@ class OpenAIModel(LLM):
         ]
 
         agen: AsyncGenerator[dict, None] = _batch_call_openai(
-            base_url=self.base_url,
+            base_urls=[self.base_url],
             headers=self.headers(),
             batch=new_batch,
             remote_call_concurrency=self.remote_call_concurrency,
@@ -132,12 +132,14 @@ def config_for_cerebras_on_openrouter() -> dict:
 
 
 async def _batch_call_openai(
-    base_url: str,
+    base_urls: list[str],
     headers: dict,
     batch: Iterable[LlmReq],
     remote_call_concurrency: int,
     timeout_secs: int = 60,
 ) -> AsyncGenerator[dict, None]:
+    urls_iter = cycle(base_urls)
+
     tasks = []
     timeout = aiohttp.ClientTimeout(sock_connect=timeout_secs, sock_read=timeout_secs)
     connector = aiohttp.TCPConnector(limit=remote_call_concurrency)
@@ -145,7 +147,7 @@ async def _batch_call_openai(
         for request_idx, req in enumerate(batch):
             json_schema = req.gen_kwargs.pop("json_schema", None)
             post_kwargs = {
-                "url": f"{base_url}/chat/completions",
+                "url": f"{next(urls_iter)}/chat/completions",
                 "headers": headers,
                 "json": {**req.gen_kwargs, "messages": req.messages},
             }
