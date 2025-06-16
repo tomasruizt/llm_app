@@ -5,6 +5,7 @@ from llmlib.vllm_model import (
     dump_dataset_as_batch_request,
 )
 from pathlib import Path
+from llmlib.vllmserver import spinup_vllm_server
 import pytest
 from .helpers import (
     assert_model_recognizes_pyramid_in_image,
@@ -25,12 +26,33 @@ cls = ModelvLLM
 
 @pytest.fixture(scope="session")
 def vllm_model():
-    model = cls(
-        # model_id="google/gemma-3-4b-it",
-        model_id="Qwen/Qwen2.5-VL-3B-Instruct",
-        # model_id="HuggingFaceTB/SmolVLM-256M-Instruct",
-    )
-    yield model
+    model_id = "Qwen/Qwen2.5-VL-3B-Instruct"
+    cmd = vllm_test_command(model_id)
+    with spinup_vllm_server(no_op=False, vllm_command=cmd):
+        model = cls(
+            model_id=model_id,
+            # model_id="google/gemma-3-4b-it",
+            # model_id="HuggingFaceTB/SmolVLM-256M-Instruct",
+        )
+        yield model
+
+
+def vllm_test_command(model_id: str) -> list[str]:
+    return [
+        "vllm",
+        "serve",
+        model_id,
+        "--task=generate",
+        "--max-model-len=32768",
+        "--max-seq-len-to-capture=32768",
+        "--dtype=bfloat16",
+        "--allowed-local-media-path=/home/",
+        "--limit-mm-per-prompt=image=50,video=2",
+        "--disable-log-requests",
+        "--port=8000",
+        "--gpu-memory-utilization=0.8",
+        "--enforce-eager",
+    ]
 
 
 def test_vllm_model_local_warnings():
