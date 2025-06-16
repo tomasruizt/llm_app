@@ -181,12 +181,8 @@ async def _call_openai(
     try:
         async with session.post(**post_kwargs) as response:
             if response.status != 200:
-                logger.error(
-                    "OpenAI API returned status %d, text: %s",
-                    response.status,
-                    await response.text(),
-                )
-            response.raise_for_status()
+                data = await log_and_make_error(response)
+                return data | metadata
             completion = await response.json()
         asdict = as_dict(completion) | metadata
         asdict["success"] = True
@@ -194,9 +190,13 @@ async def _call_openai(
 
     except Exception as e:
         logger.error(
-            "Error calling OpenAI API for request %d. Cause: %s",
-            request_idx,
-            repr(e),
+            "Error calling OpenAI API for request %d. Cause: %s", request_idx, repr(e)
         )
-        asdict = {"request_idx": request_idx, "error": str(e), "success": False}
+        asdict = {"error": repr(e), "success": False}
         return asdict | metadata
+
+
+async def log_and_make_error(response: aiohttp.ClientResponse) -> dict:
+    error_text: str = await response.text()
+    logger.error("OpenAI API returned status %d, text: %s", response.status, error_text)
+    return {"error": error_text, "success": False}
