@@ -5,6 +5,9 @@ import requests
 import logging
 from typing import Optional
 from contextlib import contextmanager
+import signal
+import atexit
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +21,8 @@ class VLLMServer:
         self.port = int(
             [part for part in self.cmd if "--port" in part][0].split("=")[1]
         )
+        # Register cleanup handler
+        atexit.register(self.stop)
 
     def start(self) -> None:
         """
@@ -26,7 +31,9 @@ class VLLMServer:
         Raises TimeoutError if the server fails to start after 10 minutes.
         """
         logger.info("Starting vLLM server with command: %s", " ".join(self.cmd))
-        self.process = subprocess.Popen(self.cmd)
+        self.process = subprocess.Popen(
+            self.cmd, preexec_fn=os.setsid
+        )  # Create new process group
 
         # Wait for server to be ready
         max_attempts = 40  # 10 minutes total (40 * 15s = 600s = 10min)
@@ -67,13 +74,20 @@ class VLLMServer:
         """Stop the vLLM server."""
         if self.process is not None and self.is_running():
             logger.info("Stopping vLLM server (PID: %s)...", self.process.pid)
-            self.process.terminate()
             try:
+                # Send SIGTERM to the process group
+                os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
                 self.process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
+            except (subprocess.TimeoutExpired, ProcessLookupError):
                 logger.warning("Server did not terminate gracefully, forcing...")
-                self.process.kill()
-            self.process = None
+                try:
+                    os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            finally:
+                self.process = None
+                # Unregister the cleanup handler
+                atexit.unregister(self.stop)
 
     def __enter__(self):
         """Context manager entry point."""
