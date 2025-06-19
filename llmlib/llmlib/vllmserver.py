@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class VLLMServer:
     cmd: list[str]
+    timeout_mins: int = 10
 
     def __post_init__(self):
         self.process: Optional[subprocess.Popen] = None
@@ -28,7 +29,7 @@ class VLLMServer:
         """
         Start the vLLM server and wait for it to be ready.
         Raises RuntimeError if the server process dies unexpectedly.
-        Raises TimeoutError if the server fails to start after 10 minutes.
+        Raises TimeoutError if the server fails to start after timeout_mins minutes.
         """
         logger.info("Starting vLLM server with command: %s", " ".join(self.cmd))
         self.process = subprocess.Popen(
@@ -36,8 +37,8 @@ class VLLMServer:
         )  # Create new process group
 
         # Wait for server to be ready
-        max_attempts = 40  # 10 minutes total (40 * 15s = 600s = 10min)
         wait_time = 15  # seconds between attempts
+        max_attempts = self.timeout_mins * 4
 
         for attempt in range(max_attempts):
             if not self.is_running():
@@ -61,7 +62,7 @@ class VLLMServer:
             time.sleep(wait_time)
 
         raise TimeoutError(
-            f"Server failed to start after {max_attempts} attempts (10min timeout)"
+            f"Server failed to start after {max_attempts} attempts (timeout: {self.timeout_mins} mins)"
         )
 
     def is_running(self) -> bool:
@@ -77,7 +78,7 @@ class VLLMServer:
             try:
                 # Send SIGTERM to the process group
                 os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
-                self.process.wait(timeout=10)
+                self.process.wait(timeout=10)  # seconds
             except (subprocess.TimeoutExpired, ProcessLookupError):
                 logger.warning("Server did not terminate gracefully, forcing...")
                 try:
@@ -100,12 +101,12 @@ class VLLMServer:
 
 
 @contextmanager
-def spinup_vllm_server(no_op: bool, vllm_command: list[str]):
+def spinup_vllm_server(no_op: bool, vllm_command: list[str], timeout_mins: int = 10):
     if no_op:
         yield
         return
 
-    server = VLLMServer(cmd=vllm_command)
+    server = VLLMServer(cmd=vllm_command, timeout_mins=timeout_mins)
     try:
         server.start()
         yield server
