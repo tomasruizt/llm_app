@@ -6,7 +6,7 @@ from llmlib.vllm_model import (
     dump_dataset_as_batch_request,
 )
 from pathlib import Path
-from llmlib.vllmserver import spinup_vllm_server
+from llmlib.vllmserver import VLLMServer, spinup_vllm_server
 import pytest
 import requests
 from .helpers import (
@@ -26,21 +26,26 @@ from .helpers import (
 )
 
 
+model_id = "Qwen/Qwen2.5-VL-3B-Instruct"
 cls = ModelvLLM
 
 
 @pytest.fixture(scope="session")
-def vllm_model():
-    model_id = "Qwen/Qwen2.5-VL-3B-Instruct"
+def vllm_server():
     cmd = vllm_test_command(model_id)
-    with spinup_vllm_server(no_op=True, vllm_command=cmd):
-        model = cls(
-            model_id=model_id,
-            timeout_secs=5,
-            # model_id="google/gemma-3-4b-it",
-            # model_id="HuggingFaceTB/SmolVLM-256M-Instruct",
-        )
-        yield model
+    with spinup_vllm_server(no_op=True, vllm_command=cmd) as server:
+        yield server
+
+
+@pytest.fixture(scope="session")
+def vllm_model(vllm_server: VLLMServer):
+    model = cls(
+        model_id=model_id,
+        timeout_secs=5,
+        # model_id="google/gemma-3-4b-it",
+        # model_id="HuggingFaceTB/SmolVLM-256M-Instruct",
+    )
+    yield model
 
 
 def vllm_test_command(model_id: str) -> list[str]:
@@ -198,6 +203,12 @@ def test_vllm_model_local_multi_turn_with_images(vllm_model):
 # Qwen 3B cannot correctly answer this
 # def test_vllm_model_local_multi_turn_with_6min_video(vllm_model):
 #     assert_model_supports_multiturn_with_6min_video(vllm_model)
+
+
+def test_vllm_server_get_models(vllm_server: VLLMServer):
+    models = vllm_server.get_models()
+    ids = [m["id"] for m in models["data"]]
+    assert model_id in ids, ids
 
 
 @contextmanager

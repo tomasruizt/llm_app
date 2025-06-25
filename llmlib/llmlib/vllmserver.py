@@ -99,14 +99,21 @@ class VLLMServer:
         """Context manager exit point."""
         self.stop()
 
+    def get_models(self) -> list[dict]:
+        """Get the list of models available on the server."""
+        response = requests.get(f"http://localhost:{self.port}/v1/models")
+        response.raise_for_status()
+        return response.json()
+
 
 @contextmanager
 def spinup_vllm_server(no_op: bool, vllm_command: list[str], timeout_mins: int = 10):
+    server = VLLMServer(cmd=vllm_command, timeout_mins=timeout_mins)
+
     if no_op:
-        yield
+        yield server
         return
 
-    server = VLLMServer(cmd=vllm_command, timeout_mins=timeout_mins)
     try:
         server.start()
         yield server
