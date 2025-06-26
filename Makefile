@@ -7,7 +7,7 @@ vllm-server:
 		--max-model-len 32768 \
 		--max-seq-len-to-capture 32768 \
 		--dtype bfloat16 \
-		--allowed-local-media-path=/home/ \
+		--allowed-local-media-path=/ \
 		--limit-mm-per-prompt "image=50,video=2" \
 		--disable-log-requests \
 		--port 8000 \
