@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 models/
 profiles/
-test-files/batch-gemini/submit_confirmation.json
+test-files/unittest-batch-gemini/submit_confirmation.json
 # C extensions
 *.so
 

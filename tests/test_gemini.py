@@ -115,7 +115,7 @@ def test_batch_mode_inference():
             gen_kwargs={"temperature": 0.0},
         ),
     ]
-    tgt_dir = file_for_test("batch-gemini/")
+    tgt_dir = file_for_test("unittest-batch-gemini/")
     model.submit_batch_job(batch, tgt_dir=tgt_dir)
     assert Path(tgt_dir / "input.jsonl").exists()
     assert Path(tgt_dir / "submit_confirmation.json").exists()
