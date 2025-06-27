@@ -60,8 +60,8 @@ class GeminiModels(StrEnum):
     https://cloud.google.com/vertex-ai/generative-ai/docs/context-cache/context-cache-overview#supported_models
     """
 
-    gemini_25_pro = "gemini-2.5-pro-preview-06-05"
-    default = gemini_25_flash = "gemini-2.5-flash-preview-04-17"
+    gemini_25_pro = "gemini-2.5-pro"
+    default = gemini_25_flash = "gemini-2.5-flash"
     gemini_20_flash = "gemini-2.0-flash-001"
     gemini_20_flash_lite = "gemini-2.0-flash-lite-001"
 
@@ -420,7 +420,7 @@ class GeminiAPI(LLM):
             "While Gemini supports multi-turn, and multi-file chat, we have only implemented single-file and single-turn prompts atm."
         ]
 
-    def submit_batch_job(self, entries: list[LlmReq], tgt_dir: Path) -> str:
+    def submit_batch_job(self, entries: list[LlmReq], tgt_dir: Path | str) -> str:
         name: str = submit_batch_job(
             model_id=self.model_id,
             entries=entries,
@@ -487,12 +487,13 @@ def PathNeededError():
 def submit_batch_job(
     model_id: str,
     entries: list[LlmReq],
-    tgt_dir: Path,
+    tgt_dir: Path | str,
     safety_filter_threshold: HarmBlockThreshold,
     location: str,
 ) -> str:
     # Create and dump input jsonl file
     input_rows: list[dict] = [to_batch_row(c, safety_filter_threshold) for c in entries]
+    tgt_dir = Path(tgt_dir)
     tgt_dir.mkdir(parents=True, exist_ok=True)
     input_jsonl = tgt_dir / "input.jsonl"
     pd.DataFrame(input_rows).to_json(input_jsonl, orient="records", lines=True)
@@ -522,7 +523,12 @@ def submit_batch_job(
         excluded_fields=excluded_fields,
         location=location,
     )
-    response.raise_for_status()
+    if response.status_code != 200:
+        raise Exception(
+            "Failed to submit batch job. status_code={}, response={}".format(
+                response.status_code, response.text
+            )
+        )
     logger.info("Successfully submitted batch prediction job. JSON=%s", response.json())
     return response.json()["name"]
 

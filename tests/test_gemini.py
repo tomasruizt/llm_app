@@ -102,7 +102,7 @@ def test_get_cached_content():
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_batch_mode_inference():
-    model = GeminiAPI(model_id=GeminiModels.gemini_20_flash, location="us-central1")
+    model = GeminiAPI(model_id=GeminiModels.gemini_25_flash)
     batch = [
         LlmReq(
             convo=[two_imgs_message()],
