@@ -529,8 +529,13 @@ def submit_batch_job(
                 response.status_code, response.text
             )
         )
-    logger.info("Successfully submitted batch prediction job. JSON=%s", response.json())
-    return response.json()["name"]
+    confirmation_data = response.json()
+    logger.info(
+        "Successfully submitted batch prediction job. JSON=%s", confirmation_data
+    )
+    confirmation_file = tgt_dir / "submit_confirmation.json"
+    confirmation_file.write_text(json.dumps(confirmation_data, indent=2))
+    return confirmation_data["name"]
 
 
 def to_batch_row(be: LlmReq, threshold: HarmBlockThreshold) -> dict:
