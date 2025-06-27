@@ -1,4 +1,5 @@
 from pathlib import Path
+import shutil
 from llmlib.base_llm import LlmReq
 from llmlib.gemini.gemini_code import (
     GeminiAPI,
@@ -116,6 +117,7 @@ def test_batch_mode_inference():
         ),
     ]
     tgt_dir = file_for_test("unittest-batch-gemini/")
+    shutil.rmtree(tgt_dir, ignore_errors=True)
     model.submit_batch_job(batch, tgt_dir=tgt_dir)
     assert Path(tgt_dir / "input.jsonl").exists()
     assert Path(tgt_dir / "submit_confirmation.json").exists()

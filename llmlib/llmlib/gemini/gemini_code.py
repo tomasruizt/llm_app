@@ -546,12 +546,13 @@ def to_batch_row(be: LlmReq, threshold: HarmBlockThreshold) -> dict:
         }
         for msg in be.convo
     ]
+    config = be.gen_kwargs | {"thinking_config": {"include_thoughts": True}}
     return {
         **be.metadata,
         "request": {
             "contents": contents,
             "safetySettings": safety_filters(threshold=threshold),
-            "generation_config": be.gen_kwargs,
+            "generation_config": config,
         },
     }
 
