@@ -1,6 +1,6 @@
 from pathlib import Path
+from llmlib.base_llm import LlmReq
 from llmlib.gemini.gemini_code import (
-    BatchEntry,
     GeminiAPI,
     GeminiModels,
     cache_content,
@@ -22,7 +22,8 @@ from tests.helpers import (
     assert_model_supports_multiturn_with_multiple_imgs,
     file_for_test,
     is_ci,
-    video_file,
+    two_imgs_message,
+    video_message2,
 )
 
 
@@ -103,15 +104,15 @@ def test_get_cached_content():
 def test_batch_mode_inference():
     model = GeminiAPI(model_id=GeminiModels.gemini_20_flash, location="us-central1")
     batch = [
-        BatchEntry(
-            prompt="What do you see in each image?",
-            files=[file_for_test("pyramid.jpg"), file_for_test("mona-lisa.png")],
-            row_data={"post": "123", "author": "John Doe"},
+        LlmReq(
+            convo=[two_imgs_message()],
+            metadata={"post": "123", "author": "John Doe"},
+            gen_kwargs={"temperature": 0.0},
         ),
-        BatchEntry(
-            prompt="What do you see in the video?",
-            files=[video_file()],
-            row_data={"post": "567", "author": "Jane Doe"},
+        LlmReq(
+            convo=[video_message2()],
+            metadata={"post": "567", "author": "Jane Doe"},
+            gen_kwargs={"temperature": 0.0},
         ),
     ]
     tgt_dir = file_for_test("batch-gemini/")

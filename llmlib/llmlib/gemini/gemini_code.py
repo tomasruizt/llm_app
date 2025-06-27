@@ -187,11 +187,14 @@ def get_cached_content(
     return None, False
 
 
-def convert_to_gemini_format(msg: Message) -> tuple[Content, list[storage.Blob]]:
-    role_map = dict(user="user", assistant="model")
-    role = role_map[msg.role]
+def convert_to_gemini_format(msg: Message) -> Content:
+    role: str = role_map(msg.role)
     parts = [Part.from_text(text=msg.msg)]
     return Content(role=role, parts=parts)
+
+
+def role_map(role: str) -> str:
+    return dict(user="user", assistant="model")[role]
 
 
 def _call_gemini(
@@ -417,7 +420,7 @@ class GeminiAPI(LLM):
             "While Gemini supports multi-turn, and multi-file chat, we have only implemented single-file and single-turn prompts atm."
         ]
 
-    def submit_batch_job(self, entries: list["BatchEntry"], tgt_dir: Path) -> str:
+    def submit_batch_job(self, entries: list[LlmReq], tgt_dir: Path) -> str:
         name: str = submit_batch_job(
             model_id=self.model_id,
             entries=entries,
@@ -483,7 +486,7 @@ def PathNeededError():
 
 def submit_batch_job(
     model_id: str,
-    entries: list["BatchEntry"],
+    entries: list[LlmReq],
     tgt_dir: Path,
     safety_filter_threshold: HarmBlockThreshold,
     location: str,
@@ -502,7 +505,7 @@ def submit_batch_job(
     )
 
     # Upload media files
-    all_files = [file for e in entries for file in e.files]
+    all_files = [file for e in entries for m in e.convo for file in m.files]
     for files in tqdm(chunk(all_files, 2500)):
         upload_files(files)
 
@@ -510,7 +513,7 @@ def submit_batch_job(
     output_dir = f"{batch_name}/output"
     input_uri: str = storage_uri(Buckets.output, blob_name=input_blob_name)
     output_uri: str = storage_uri(Buckets.output, blob_name=output_dir)
-    excluded_fields = list(set(k for e in entries for k in e.row_data.keys()))
+    excluded_fields = list(set(k for e in entries for k in e.metadata.keys()))
     response = submit_batch(
         model_id=model_id,
         batch_name=batch_name,
@@ -524,23 +527,20 @@ def submit_batch_job(
     return response.json()["name"]
 
 
-@dataclass
-class BatchEntry:
-    prompt: str
-    files: list[Path]
-    """The row_data is not seen by the LLM, just used to identify the row"""
-    row_data: dict[str, str]
-
-
-def to_batch_row(be: BatchEntry, threshold: HarmBlockThreshold) -> dict:
-    file_parts = [part_dict(f) for f in be.files]
+def to_batch_row(be: LlmReq, threshold: HarmBlockThreshold) -> dict:
+    contents = [
+        {
+            "role": role_map(msg.role),
+            "parts": [part_dict(f) for f in msg.files] + [{"text": msg.msg}],
+        }
+        for msg in be.convo
+    ]
     return {
-        **be.row_data,
+        **be.metadata,
         "request": {
-            "contents": [{"role": "user", "parts": [*file_parts, {"text": be.prompt}]}],
-            # TODO: This line below might need serialization
+            "contents": contents,
             "safetySettings": safety_filters(threshold=threshold),
-            "generation_config": {"temperature": 0.0},
+            "generation_config": be.gen_kwargs,
         },
     }
 

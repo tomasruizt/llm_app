@@ -234,6 +234,22 @@ def video_message() -> Message:
     return Message(role="user", msg="What country are they visiting?", video=video)
 
 
+def video_message2() -> Message:
+    return Message(
+        role="user",
+        msg="What do you see in the video?",
+        files=[video_file()],
+    )
+
+
+def two_imgs_message() -> Message:
+    return Message(
+        role="user",
+        msg="What do you see in each image?",
+        files=[file_for_test("pyramid.jpg"), file_for_test("mona-lisa.png")],
+    )
+
+
 def video_file() -> Path:
     return file_for_test("tasting travel - rome italy.mp4")
 
