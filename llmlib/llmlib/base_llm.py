@@ -15,8 +15,7 @@ class Message:
     img_name: str | None = None
     img: Path | Image.Image | None = None
     video: Path | BytesIO | None = None
-    # TODO: make default files an empty list
-    files: list[Path] | None = None
+    files: list[Path] | None = field(default_factory=list)
 
     @classmethod
     def from_prompt(cls, prompt: str) -> Self:
@@ -77,5 +76,10 @@ class LLM:
 def validate_only_first_message_has_files(messages: list[Message]) -> None:
     """Validate that only the first message can have file(s)."""
     for msg in messages[1:]:
-        if msg.has_image() or msg.has_video() or msg.files is not None:
+        if (
+            msg.has_image()
+            or msg.has_video()
+            or msg.files is not None
+            and len(msg.files) > 0
+        ):
             raise ValueError("Only the first message can have file(s)")
