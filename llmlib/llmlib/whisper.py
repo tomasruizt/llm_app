@@ -17,6 +17,7 @@ logger = getLogger(__name__)
 
 def create_whisper_pipe(
     attn_implementation: str = "flash_attention_2",
+    compile: bool = False,
 ) -> AutomaticSpeechRecognitionPipeline:
     device = "cuda"
     torch_dtype = torch.float16
@@ -29,6 +30,9 @@ def create_whisper_pipe(
         attn_implementation=attn_implementation,
     )
     model.to(device)
+    if compile:
+        logger.info("Compiling %s", model_id)
+        model = torch.compile(model)
 
     processor = AutoProcessor.from_pretrained(model_id)
 
@@ -61,6 +65,8 @@ model_id = "openai/whisper-large-v3-turbo"
 class Whisper:
     model_id = model_id
     use_flash_attention: bool = True
+    compile: bool = False
+    batch_size: int = 50
 
     def __post_init__(self):
         if self.use_flash_attention:
@@ -70,6 +76,7 @@ class Whisper:
 
         self.pipe = create_whisper_pipe(
             attn_implementation=attn_implementation,
+            compile=self.compile,
         )
 
     def transcribe_file(self, file: str | Path, translate=False) -> str:
@@ -89,16 +96,51 @@ class Whisper:
                 return text(output)
             raise
 
+    def transcribe_batch(
+        self, files: list[str | Path], translate=False
+    ) -> list[str | Exception]:
+        """Transcribe multiple files in a batch for better GPU efficiency"""
+        if len(files) == 0:
+            return []
+
+        file_paths = [str(f) if isinstance(f, Path) else f for f in files]
+        logger.info("Transcribing batch of %d files", len(file_paths))
+
+        try:
+            # Try batch processing first for efficiency
+            outputs = self.run_pipe(file_paths, translate, return_timestamps=True)
+            return [text(output) for output in outputs]
+        except Exception as e:
+            # If batch processing fails, fall back to individual processing
+            logger.error(
+                "Batch processing failed, falling back to individual processing: %s",
+                repr(e),
+            )
+            results = []
+            for file_path in file_paths:
+                try:
+                    output = self.run_pipe(file_path, translate, return_timestamps=True)
+                    results.append(text(output))
+                except Exception as file_error:
+                    results.append(file_error)
+            return results
+
     def run_pipe(
-        self, file: str, translate: bool, return_timestamps: bool
-    ) -> WhisperOutput:
+        self, file_or_files: str | list[str], translate: bool, return_timestamps: bool
+    ) -> WhisperOutput | list[WhisperOutput]:
+        """Run the pipeline on a single file or a list of files"""
         kwargs: dict[str, Any] = {"return_timestamps": return_timestamps}
         if translate:
             kwargs["generate_kwargs"] = {"language": "english"}
         # ignore this warning:
         # .../site-packages/transformers/models/whisper/generation_whisper.py:496: FutureWarning: The input name `inputs` is deprecated. Please make sure to use `input_features` instead.
         with warnings.catch_warnings(action="ignore", category=FutureWarning):
-            data: WhisperOutput = self.pipe(file, **kwargs)
+            data = self.pipe(
+                file_or_files,
+                **kwargs,
+                batch_size=self.batch_size,
+                chunk_length_s=30,
+            )
         return data
 
 
