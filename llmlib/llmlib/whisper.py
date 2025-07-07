@@ -84,17 +84,8 @@ class Whisper:
             file = str(file)
         assert isinstance(file, str)
         logger.info("Transcribing file: %s", file)
-        try:
-            output: WhisperOutput = self.run_pipe(
-                file, translate, return_timestamps=False
-            )
-            return text(output)
-        except ValueError as e:
-            if "Please either pass `return_timestamps=True`" in repr(e):
-                logger.info("File is >30s, transcribing with timestamps: %s", file)
-                output = self.run_pipe(file, translate, return_timestamps=True)
-                return text(output)
-            raise
+        output: WhisperOutput = self.run_pipe(file, translate)
+        return text(output)
 
     def transcribe_batch(
         self, files: list[str | Path], translate=False
@@ -108,7 +99,7 @@ class Whisper:
 
         try:
             # Try batch processing first for efficiency
-            outputs = self.run_pipe(file_paths, translate, return_timestamps=True)
+            outputs = self.run_pipe(file_paths, translate)
             return [text(output) for output in outputs]
         except Exception as e:
             # If batch processing fails, fall back to individual processing
@@ -119,17 +110,17 @@ class Whisper:
             results = []
             for file_path in file_paths:
                 try:
-                    output = self.run_pipe(file_path, translate, return_timestamps=True)
+                    output = self.run_pipe(file_path, translate)
                     results.append(text(output))
                 except Exception as file_error:
                     results.append(file_error)
             return results
 
     def run_pipe(
-        self, file_or_files: str | list[str], translate: bool, return_timestamps: bool
+        self, file_or_files: str | list[str], translate: bool
     ) -> WhisperOutput | list[WhisperOutput]:
         """Run the pipeline on a single file or a list of files"""
-        kwargs: dict[str, Any] = {"return_timestamps": return_timestamps}
+        kwargs: dict[str, Any] = {"return_timestamps": True}
         if translate:
             kwargs["generate_kwargs"] = {"language": "english"}
         # ignore this warning:

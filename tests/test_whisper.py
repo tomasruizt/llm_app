@@ -30,9 +30,7 @@ def test_video_transcription(model: Whisper):
 @pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
 def test_video_transcription_with_timestamps(model: Whisper, snapshot):
     video_file = str(file_for_test("video.mp4"))
-    output: WhisperOutput = model.run_pipe(
-        video_file, translate=False, return_timestamps=True
-    )
+    output: WhisperOutput = model.run_pipe(video_file, translate=False)
     snapshot.assert_match(json.dumps(output, indent=2), "transcription.json")
 
 
