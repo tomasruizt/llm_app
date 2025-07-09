@@ -55,27 +55,11 @@ def test_multilingual_transcription(model: Whisper):
     assert isinstance(transcription, str)
 
 
-@pytest.mark.skip(reason="Run vLLM server")
-def test_whisper_vllm():
-    from openai import OpenAI
-
-    client = OpenAI(
-        api_key="EMPTY",
-        base_url="http://localhost:9000/v1",
-    )
+def test_whisper_vllm(model: Whisper):
     fpath = file_for_test("some-audio.flac")
     assert fpath.exists()
-
     expected_transcription = "before he had time to answer a much encumbered vera burst into the room with the question i say can i leave these here these were a small black pig and a lusty specimen of black-red game-cock"
-
-    with open(str(fpath), "rb") as f:
-        transcription = client.audio.transcriptions.create(
-            file=f,
-            model="openai/whisper-large-v3-turbo",
-            language="en",
-            response_format="text",
-            temperature=0.0,
-        )
+    transcription = model.transcribe_batch_vllm([fpath])
     assert expected_transcription in transcription
 
 
