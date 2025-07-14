@@ -30,10 +30,10 @@ from tests.helpers import (
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_gemini_vision_using_interface():
-    model = GeminiAPI()
+    model = GeminiAPI(max_output_tokens=5_000)
     assert_model_knows_capital_of_france(model)
     assert_model_recognizes_pyramid_in_image(model)
-    assert_model_recognizes_afd_in_video(model, max_output_tokens=20000)
+    assert_model_recognizes_afd_in_video(model)
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")

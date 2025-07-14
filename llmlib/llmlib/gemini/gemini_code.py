@@ -205,7 +205,7 @@ def _call_gemini(
 ) -> tuple[GenerateContentResponse, dict]:
     logger.info("Calling the Google API. model_name='%s'", req.model_name)
     default_gen_kwargs = {
-        "max_output_tokens": 1000,
+        "max_output_tokens": default_max_n_tokens,
         "temperature": 0.0,
         "safety_settings": safety_filters(req.safety_filter_threshold),
     }
@@ -366,6 +366,9 @@ class ResponseRefusedException(Exception):
     pass
 
 
+default_max_n_tokens = 1_000
+
+
 @dataclass
 class GeminiAPI(LLM):
     model_id: str = GeminiModels.default
@@ -375,6 +378,7 @@ class GeminiAPI(LLM):
     location: str = default_location  # https://cloud.google.com/about/locations#europe
     max_n_batching_threads: int = 16
     include_thoughts: bool = False
+    max_output_tokens: int = default_max_n_tokens
 
     requires_gpu_exclusively = False
     model_ids = available_models
@@ -386,6 +390,7 @@ class GeminiAPI(LLM):
         json_schema: type[BaseModel] | None = None,
         **gen_kwargs,
     ) -> str:
+        gen_kwargs = self.gen_kwargs() | gen_kwargs
         req = self._multiturn_req(
             msgs=msgs,
             output_dict=output_dict,
@@ -445,7 +450,8 @@ class GeminiAPI(LLM):
     def _complete_single_llmreq(self, args: tuple[int, LlmReq]) -> dict:
         request_idx, req = args
         try:
-            mt_kwargs = {"gen_kwargs": req.gen_kwargs, "output_dict": True}
+            gen_kwargs = self.gen_kwargs() | req.gen_kwargs
+            mt_kwargs = {"gen_kwargs": gen_kwargs, "output_dict": True}
             mt_req = self._multiturn_req(msgs=req.convo, **mt_kwargs)
             data = mt_req.fetch_media_description()
             data = data | {"success": True, "request_idx": request_idx, **req.metadata}
@@ -458,6 +464,9 @@ class GeminiAPI(LLM):
                 "error": str(e),
                 **req.metadata,
             }
+
+    def gen_kwargs(self) -> dict:
+        return {"max_output_tokens": self.max_output_tokens}
 
 
 def filepaths(msg: Message) -> list[Path]:
