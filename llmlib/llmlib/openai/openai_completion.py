@@ -121,14 +121,13 @@ def extract_msg(msg: Message) -> dict:
     }
 
 
-def config_for_cerebras_on_openrouter() -> dict:
-    """kwargs for OpenAIModel to use Cerebras on OpenRouter"""
+def config_for_openrouter():
     logger.info("Reading OpenRouter API key from environment variable")
-    return {
+    config = {
         "base_url": "https://openrouter.ai/api/v1",
         "api_key": os.environ["OPENROUTER_API_KEY"],
-        "generation_kwargs": {"provider": {"only": ["Cerebras"]}},
     }
+    return config
 
 
 async def _batch_call_openai(
