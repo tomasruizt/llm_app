@@ -23,6 +23,7 @@ from .helpers import (
     assert_model_can_answer_batch_of_text_prompts,
     # assert_model_supports_multiturn_with_6min_video,
     assert_model_supports_multiturn,
+    assert_model_returns_failure_when_hitting_token_limit,
 )
 
 
@@ -203,6 +204,10 @@ def test_vllm_model_local_multi_turn_with_images(vllm_model):
 # Qwen 3B cannot correctly answer this
 # def test_vllm_model_local_multi_turn_with_6min_video(vllm_model):
 #     assert_model_supports_multiturn_with_6min_video(vllm_model)
+
+
+def test_vllm_model_returns_failure_when_hitting_token_limit(vllm_model):
+    assert_model_returns_failure_when_hitting_token_limit(vllm_model)
 
 
 def test_vllm_server_get_models(vllm_server: VLLMServer):

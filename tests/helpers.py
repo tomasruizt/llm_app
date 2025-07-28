@@ -325,3 +325,13 @@ def assert_model_can_use_multiple_gen_kwargs(model: LLM):
     assert r1["temperature"] == 0.5, r1["temperature"]
     assert "temperature" in r2, r2
     assert r2["temperature"] == 0.8, r2["temperature"]
+
+
+def assert_model_returns_failure_when_hitting_token_limit(model: LLM):
+    req = LlmReq(
+        convo=[Message.from_prompt(prompt="Whats the capital of France?")],
+        gen_kwargs={"max_tokens": 2},
+    )
+    response = list(model.complete_batchof_reqs(batch=[req]))[0]
+    assert not response["success"]
+    assert "n_output_tokens equals max_tokens" in response["error"]

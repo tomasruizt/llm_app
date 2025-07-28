@@ -184,7 +184,7 @@ async def _call_openai(
                 return data | metadata
             completion = await response.json()
         asdict = as_dict(completion) | metadata
-        asdict["success"] = True
+        set_success(asdict)
         return asdict
 
     except Exception as e:
@@ -193,6 +193,20 @@ async def _call_openai(
         )
         asdict = {"error": repr(e), "success": False}
         return asdict | metadata
+
+
+def set_success(asdict: dict) -> None:
+    asdict["success"] = True
+    check_tok_lims = "max_tokens" in asdict and "n_output_tokens" in asdict
+    if not check_tok_lims:
+        return
+    within_tok_lims = asdict["n_output_tokens"] < asdict["max_tokens"]
+    if within_tok_lims:
+        return
+    # Reached token limit
+    assert "error" not in asdict, asdict  # We should not overwrite an error
+    asdict["error"] = "n_output_tokens equals max_tokens"
+    asdict["success"] = False
 
 
 async def log_and_make_error(response: aiohttp.ClientResponse) -> dict:
