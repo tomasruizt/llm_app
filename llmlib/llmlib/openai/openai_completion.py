@@ -5,7 +5,7 @@ import os
 from typing import Generator, Iterable, AsyncGenerator
 import aiohttp
 import asyncio
-from tenacity import retry, stop_after_attempt, retry_if_exception_type
+from tenacity import RetryCallState, retry, stop_after_attempt, retry_if_exception_type
 from ..base_llm import LLM, LlmReq, Conversation, Message
 from ..rest_api.restapi_client import encode_as_png_in_base64
 
@@ -171,9 +171,17 @@ async def _batch_call_openai(
             yield await task
 
 
+def _log_retry_attempt(retry_state: RetryCallState):
+    logger.warning(
+        "Retrying OpenAI API call (attempt %d/3) due to timeout",
+        retry_state.attempt_number + 1,
+    )
+
+
 @retry(
     stop=stop_after_attempt(3),
     retry=retry_if_exception_type(aiohttp.SocketTimeoutError),
+    before_sleep=_log_retry_attempt,
 )
 async def _call_openai(
     session: aiohttp.ClientSession, post_kwargs: dict, metadata: dict
