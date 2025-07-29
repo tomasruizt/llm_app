@@ -5,6 +5,7 @@ import os
 from typing import Generator, Iterable, AsyncGenerator
 import aiohttp
 import asyncio
+from tenacity import retry, stop_after_attempt, retry_if_exception_type
 from ..base_llm import LLM, LlmReq, Conversation, Message
 from ..rest_api.restapi_client import encode_as_png_in_base64
 
@@ -159,7 +160,7 @@ async def _batch_call_openai(
                     },
                 }
             metadata = req.metadata | {"request_idx": request_idx} | req.gen_kwargs
-            coro = _call_openai(
+            coro = _call_openai_safely(
                 session=session,
                 post_kwargs=post_kwargs,
                 metadata=metadata,
@@ -170,23 +171,30 @@ async def _batch_call_openai(
             yield await task
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    retry=retry_if_exception_type(aiohttp.SocketTimeoutError),
+)
 async def _call_openai(
-    session: aiohttp.ClientSession,
-    post_kwargs: dict,
-    metadata: dict,
+    session: aiohttp.ClientSession, post_kwargs: dict, metadata: dict
+) -> dict:
+    async with session.post(**post_kwargs) as response:
+        if response.status != 200:
+            data = await log_and_make_error(response)
+            return data | metadata
+        completion = await response.json()
+    asdict = as_dict(completion) | metadata
+    set_success(asdict)
+    return asdict
+
+
+async def _call_openai_safely(
+    session: aiohttp.ClientSession, post_kwargs: dict, metadata: dict
 ) -> dict:
     request_idx = metadata["request_idx"]
     logger.debug("Calling OpenAI API for request %d", request_idx)
     try:
-        async with session.post(**post_kwargs) as response:
-            if response.status != 200:
-                data = await log_and_make_error(response)
-                return data | metadata
-            completion = await response.json()
-        asdict = as_dict(completion) | metadata
-        set_success(asdict)
-        return asdict
-
+        return await _call_openai(session, post_kwargs, metadata)
     except Exception as e:
         logger.error(
             "Error calling OpenAI API for request %d. Cause: %s", request_idx, repr(e)
