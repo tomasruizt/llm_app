@@ -109,7 +109,7 @@ class OpenAIModel(LLM):
 def to_synchronous_generator(
     agen: AsyncGenerator[dict, None],
 ) -> Generator[dict, None, None]:
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
     try:
         while True:
             output: dict = loop.run_until_complete(agen.__anext__())
