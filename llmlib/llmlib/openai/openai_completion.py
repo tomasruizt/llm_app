@@ -24,8 +24,10 @@ class OpenAIModel(LLM):
     model_id: str = _default_model
     base_url: str = "https://api.openai.com/v1"
     api_key: str = field(default_factory=get_openai_api_key)
-    generation_kwargs: dict = field(default_factory=dict)
     remote_call_concurrency: int = 32
+    timeout_secs: int = 60
+    temperature: float = 0.0
+    max_new_tokens: int = 500
 
     def headers(self) -> dict:
         return {
@@ -53,8 +55,11 @@ class OpenAIModel(LLM):
         if metadatas is None:
             metadatas = cycle([{}])
 
-        gen_kwargs = {"model": self.model_id, "temperature": 0.0} | gen_kwargs
-        gen_kwargs = gen_kwargs | self.generation_kwargs
+        gen_kwargs = {
+            "model": self.model_id,
+            "temperature": self.temperature,
+            "max_tokens": self.max_new_tokens,
+        } | gen_kwargs
 
         new_batch = [
             LlmReq(
@@ -71,6 +76,31 @@ class OpenAIModel(LLM):
             headers=self.headers(),
             batch=new_batch,
             remote_call_concurrency=self.remote_call_concurrency,
+            timeout_secs=self.timeout_secs,
+        )
+        gen = to_synchronous_generator(agen)
+        return gen
+
+    def complete_batchof_reqs(self, batch: Iterable[LlmReq]) -> Iterable[dict]:
+        fixed_gen_kwargs = dict(
+            model=self.model_id,
+            temperature=self.temperature,
+            max_tokens=self.max_new_tokens,
+        )
+        new_batch = [
+            req.replace(
+                gen_kwargs=fixed_gen_kwargs | req.gen_kwargs,
+                messages=extract_msgs(req.convo),
+            )
+            for req in batch
+        ]
+        base_urls = [self.base_url]
+        agen = _batch_call_openai(
+            base_urls=base_urls,
+            headers=self.headers(),
+            batch=new_batch,
+            remote_call_concurrency=self.remote_call_concurrency,
+            timeout_secs=self.timeout_secs,
         )
         gen = to_synchronous_generator(agen)
         return gen

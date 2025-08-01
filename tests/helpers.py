@@ -309,7 +309,7 @@ def assert_model_can_output_json_schema(model: LLM, check_batch_mode: bool = Tru
     assert len(group2["people"]) == 3
 
 
-def assert_model_can_use_multiple_gen_kwargs(model: LLM):
+def assert_model_can_use_multiple_gen_kwargs_in_batch(model: LLM):
     req1 = LlmReq(
         convo=[Message.from_prompt(prompt="Whats the capital of France?")],
         gen_kwargs={"temperature": 0.5},
@@ -321,6 +321,8 @@ def assert_model_can_use_multiple_gen_kwargs(model: LLM):
     responses = model.complete_batchof_reqs(batch=[req1, req2])
     r1, r2 = list(sorted(responses, key=lambda r: r["request_idx"]))
 
+    assert r1["success"], r1
+    assert r2["success"], r2
     assert "temperature" in r1, r1
     assert r1["temperature"] == 0.5, r1["temperature"]
     assert "temperature" in r2, r2

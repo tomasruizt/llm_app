@@ -12,6 +12,7 @@ from deepdiff import DeepDiff
 from .helpers import (
     assert_model_can_answer_batch_of_text_prompts,
     assert_model_can_output_json_schema,
+    assert_model_can_use_multiple_gen_kwargs_in_batch,
     assert_model_knows_capital_of_france,
     assert_model_recognizes_pyramid_in_image,
     assert_model_returns_passed_metadata,
@@ -60,6 +61,14 @@ def test_openrouter_knows_capital_of_france():
         **config_for_openrouter(),
     )
     assert_model_knows_capital_of_france(model, output_dict=True, check_thoughts=True)
+
+
+def test_openrouter_can_use_multiple_gen_kwargs_in_batch():
+    model: LLM = OpenAIModel(
+        model_id="Qwen/Qwen3-32B",
+        **config_for_openrouter(),
+    )
+    assert_model_can_use_multiple_gen_kwargs_in_batch(model)
 
 
 def test_openai_can_answer_batch_of_text_prompts():
