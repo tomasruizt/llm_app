@@ -179,7 +179,7 @@ def _log_retry_attempt(retry_state: RetryCallState):
 
 
 @retry(
-    stop=stop_after_attempt(3),
+    stop=stop_after_attempt(2),
     retry=retry_if_exception_type(aiohttp.SocketTimeoutError),
     before_sleep=_log_retry_attempt,
 )
