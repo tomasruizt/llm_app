@@ -2,6 +2,7 @@ from llmlib.base_llm import LLM, Message
 from PIL import Image
 from llmlib.openai.openai_transcription import TranscriptionModel
 from llmlib.rest_api.restapi_client import encode_as_png_in_base64
+from llmlib.semantic_similarity import SemanticSimilarity
 import pytest
 from llmlib.openai.openai_completion import (
     OpenAIModel,
@@ -95,6 +96,21 @@ def test_transcription_openai():
     files = [case.file for case in cases]
     assert all(f.exists() for f in files)
 
-    transcriptions = model.transcribe_batch_vllm(files)
+    transcriptions = model.transcribe_batch(files)
     for actual, case in zip(transcriptions, cases):
         assert_string_almost_equal(actual, case.expected_transcription)
+
+
+def test_translation(semantic_similarity: SemanticSimilarity):
+    model = TranscriptionModel()
+    case = TranscriptionCases.afd_video
+    translation = model.transcribe_batch([case.file], translate=True)
+    similarity = semantic_similarity.cos_sim(
+        translation[0], case.english_translation_en
+    )
+    assert similarity > 0.8
+
+
+@pytest.fixture(scope="session")
+def semantic_similarity():
+    yield SemanticSimilarity()

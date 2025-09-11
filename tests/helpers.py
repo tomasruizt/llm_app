@@ -351,6 +351,7 @@ def assert_string_almost_equal(s1: str, s2: str):
 class TranscriptionCase:
     file: Path
     expected_transcription: str
+    english_translation_en: str | None = None
 
 
 class TranscriptionCases:
@@ -361,4 +362,6 @@ class TranscriptionCases:
     afd_video = TranscriptionCase(
         file=file_for_test("video.mp4"),
         expected_transcription="Der Ruf von Franz Josef Strauß, damals nicht das rot-grüne Narrenschiff zu betreten, ist nicht nur ignoriert worden. Es kam schlimmer. Die Unionsparteien oder deren Politiker sind heute wichtige Offiziere auf dem rot-grünen Narrenschiff Utopia. Es bedarf daher dringend eines Korrektivs in diesem Land und das können und werden nur wir sein. Ohne uns geht Deutschland unter in einer Flut der illegalen Migration, in einer Flut mit ungedecktem Zentralbankgeld und einem nicht endenden Dauerkrisenmodus.",
+        # Translation below by Gemini on 2025-09-11
+        english_translation_en="Franz Josef Strauss's call at the time not to board the red-green Ship of Fools wasn't just ignored—it got worse. Today, the Union parties and their politicians are important officers on the red-green Ship of Fools, Utopia. Therefore, this country urgently needs a corrective force, and only we can and will be that. Without us, Germany will sink in a flood of illegal migration, a flood of uncovered central bank money, and a never-ending state of crisis.",
     )
