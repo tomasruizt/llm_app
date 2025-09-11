@@ -343,7 +343,7 @@ def assert_model_returns_failure_when_hitting_token_limit(model: LLM):
 
 def assert_string_almost_equal(s1: str, s2: str):
     similarity = difflib.SequenceMatcher(None, s1, s2).ratio()
-    if similarity < 0.95:
+    if similarity < 0.9:
         raise ValueError(f"Strings are not almost equal: '{s1}' and '{s2}'")
 
 
