@@ -1,5 +1,6 @@
 from llmlib.base_llm import LLM, Message
 from PIL import Image
+from llmlib.openai.openai_transcription import TranscriptionModel
 from llmlib.rest_api.restapi_client import encode_as_png_in_base64
 import pytest
 from llmlib.openai.openai_completion import (
@@ -10,12 +11,14 @@ from llmlib.openai.openai_completion import (
 from deepdiff import DeepDiff
 
 from .helpers import (
+    TranscriptionCases,
     assert_model_can_answer_batch_of_text_prompts,
     assert_model_can_output_json_schema,
     assert_model_can_use_multiple_gen_kwargs_in_batch,
     assert_model_knows_capital_of_france,
     assert_model_recognizes_pyramid_in_image,
     assert_model_returns_passed_metadata,
+    assert_string_almost_equal,
     is_ci,
 )
 
@@ -84,3 +87,14 @@ def test_openai_returns_passed_metadata():
 def test_openai_can_output_json_schema():
     model: LLM = OpenAIModel()
     assert_model_can_output_json_schema(model)
+
+
+def test_transcription_openai():
+    model = TranscriptionModel()
+    cases = [TranscriptionCases.librispeech_2, TranscriptionCases.afd_video]
+    files = [case.file for case in cases]
+    assert all(f.exists() for f in files)
+
+    transcriptions = model.transcribe_batch_vllm(files)
+    for actual, case in zip(transcriptions, cases):
+        assert_string_almost_equal(actual, case.expected_transcription)

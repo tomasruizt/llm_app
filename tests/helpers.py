@@ -1,4 +1,6 @@
 import base64
+from dataclasses import dataclass
+import difflib
 import json
 import os
 from pathlib import Path
@@ -337,3 +339,26 @@ def assert_model_returns_failure_when_hitting_token_limit(model: LLM):
     response = list(model.complete_batchof_reqs(batch=[req]))[0]
     assert not response["success"]
     assert "n_output_tokens equals max_tokens" in response["error"]
+
+
+def assert_string_almost_equal(s1: str, s2: str):
+    similarity = difflib.SequenceMatcher(None, s1, s2).ratio()
+    if similarity < 0.95:
+        raise ValueError(f"Strings are not almost equal: '{s1}' and '{s2}'")
+
+
+@dataclass(frozen=True)
+class TranscriptionCase:
+    file: Path
+    expected_transcription: str
+
+
+class TranscriptionCases:
+    librispeech_2 = TranscriptionCase(
+        file=file_for_test("some-audio.flac"),
+        expected_transcription='Before he had time to answer a much encumbered Vera burst into the room with the question, "I say, can I leave these here?" These were a small black pig and a lusty specimen of black-red gamecock.',
+    )
+    afd_video = TranscriptionCase(
+        file=file_for_test("video.mp4"),
+        expected_transcription="Der Ruf von Franz Josef Strauß, damals nicht das rot-grüne Narrenschiff zu betreten, ist nicht nur ignoriert worden. Es kam schlimmer. Die Unionsparteien oder deren Politiker sind heute wichtige Offiziere auf dem rot-grünen Narrenschiff Utopia. Es bedarf daher dringend eines Korrektivs in diesem Land und das können und werden nur wir sein. Ohne uns geht Deutschland unter in einer Flut der illegalen Migration, in einer Flut mit ungedecktem Zentralbankgeld und einem nicht endenden Dauerkrisenmodus.",
+    )

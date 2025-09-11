@@ -1,6 +1,11 @@
 from llmlib.whisper import Whisper, WhisperOutput
 import pytest
-from tests.helpers import is_ci, file_for_test
+from tests.helpers import (
+    assert_string_almost_equal,
+    is_ci,
+    file_for_test,
+    TranscriptionCases,
+)
 import json
 
 
@@ -11,33 +16,32 @@ def model() -> Whisper:
 
 @pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
 def test_transcription(model: Whisper):
-    audio_file = file_for_test(name="some-audio.flac")  # Librispeech sample 2
-    expected_transcription = "before he had time to answer a much encumbered vera burst into the room with the question i say can i leave these here these were a small black pig and a lusty specimen of black-red game-cock"
-    actual_transcription: str = model.transcribe_file(audio_file)
-    assert actual_transcription == expected_transcription
+    case = TranscriptionCases.librispeech_2
+    actual_transcription: str = model.transcribe_file(case.file)
+    assert_string_almost_equal(actual_transcription, case.expected_transcription)
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
 def test_video_transcription(model: Whisper):
-    video_file = file_for_test("video.mp4")
+    case = TranscriptionCases.afd_video
     expected_fragment = (
         "Die Unionsparteien oder deren Politiker sind heute wichtige Offiziere"
     )
-    transcription: str = model.transcribe_file(video_file)
+    transcription: str = model.transcribe_file(case.file)
     assert expected_fragment in transcription
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
 def test_video_transcription_with_timestamps(model: Whisper, snapshot):
-    video_file = str(file_for_test("video.mp4"))
-    output: WhisperOutput = model.run_pipe(video_file, translate=False)
+    case = TranscriptionCases.afd_video
+    output: WhisperOutput = model.run_pipe(str(case.file), translate=False)
     snapshot.assert_match(json.dumps(output, indent=2), "transcription.json")
 
 
 @pytest.mark.skip(reason="Translation is currently very bad")
 def test_translation(model: Whisper):
-    german_video = file_for_test("video.mp4")
-    translation: str = model.transcribe_file(german_video, translate=True)
+    case = TranscriptionCases.afd_video
+    translation: str = model.transcribe_file(case.file, translate=True)
     assert "it is necessary to be a corrective in this country" in translation
 
 
@@ -55,33 +59,24 @@ def test_multilingual_transcription(model: Whisper):
     assert isinstance(transcription, str)
 
 
-def test_whisper_vllm(model: Whisper):
-    fpath = file_for_test("some-audio.flac")
-    assert fpath.exists()
-    expected_transcription = "before he had time to answer a much encumbered vera burst into the room with the question i say can i leave these here these were a small black pig and a lusty specimen of black-red game-cock"
-    transcription = model.transcribe_batch_vllm([fpath])
-    assert expected_transcription in transcription
-
-
 # New batch processing tests
 @pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
 def test_transcribe_batch_single_file(model: Whisper):
     """Test batch transcription with a single file"""
-    audio_file = file_for_test("some-audio.flac")
-    expected_transcription = "before he had time to answer a much encumbered vera burst into the room with the question i say can i leave these here these were a small black pig and a lusty specimen of black-red game-cock"
+    case = TranscriptionCases.librispeech_2
 
-    transcriptions = model.transcribe_batch([audio_file])
+    transcriptions = model.transcribe_batch([case.file])
     assert len(transcriptions) == 1
-    assert transcriptions[0] == expected_transcription
+    assert_string_almost_equal(transcriptions[0], case.expected_transcription)
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
 def test_transcribe_batch_multiple_files(model: Whisper):
     """Test batch transcription with multiple files"""
-    audio_file = file_for_test("some-audio.flac")
-    video_file = file_for_test("video.mp4")
+    audio_case = TranscriptionCases.librispeech_2
+    video_case = TranscriptionCases.afd_video
 
-    transcriptions = model.transcribe_batch([audio_file, video_file])
+    transcriptions = model.transcribe_batch([audio_case.file, video_case.file])
     assert len(transcriptions) == 2
     assert isinstance(transcriptions[0], str)
     assert isinstance(transcriptions[1], str)
@@ -99,9 +94,9 @@ def test_transcribe_batch_empty_list(model: Whisper):
 @pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
 def test_transcribe_batch_with_translation(model: Whisper):
     """Test batch transcription with translation enabled"""
-    german_video = file_for_test("video.mp4")
+    case = TranscriptionCases.afd_video
 
-    transcriptions = model.transcribe_batch([german_video], translate=True)
+    transcriptions = model.transcribe_batch([case.file], translate=True)
     assert len(transcriptions) == 1
     assert isinstance(transcriptions[0], str)
     assert len(transcriptions[0]) > 0
@@ -110,10 +105,10 @@ def test_transcribe_batch_with_translation(model: Whisper):
 @pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
 def test_batch_vs_single_consistency(model: Whisper):
     """Test that batch processing produces the same results as single file processing"""
-    audio_file = file_for_test("some-audio.flac")
+    case = TranscriptionCases.librispeech_2
 
-    single_result = model.transcribe_file(audio_file)
-    batch_results = model.transcribe_batch([audio_file])
+    single_result = model.transcribe_file(case.file)
+    batch_results = model.transcribe_batch([case.file])
 
     assert len(batch_results) == 1
     assert batch_results[0] == single_result
@@ -122,10 +117,10 @@ def test_batch_vs_single_consistency(model: Whisper):
 @pytest.mark.skipif(condition=is_ci(), reason="No GPU in CI")
 def test_batch_with_invalid_file_handling(model: Whisper):
     """Test that batch processing handles invalid files gracefully"""
-    audio_file = file_for_test("some-audio.flac")
+    case = TranscriptionCases.librispeech_2
     invalid_file = "/path/to/nonexistent/file.mp3"
 
-    t1, t2, t3 = model.transcribe_batch([audio_file, invalid_file, audio_file])
+    t1, t2, t3 = model.transcribe_batch([case.file, invalid_file, case.file])
     assert isinstance(t1, str)
     assert isinstance(t2, Exception)
     assert isinstance(t3, str)

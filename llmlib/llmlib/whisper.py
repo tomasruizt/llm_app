@@ -4,8 +4,6 @@ from logging import getLogger
 from pathlib import Path
 from typing import Any, TypedDict
 import warnings
-from openai import OpenAI
-from openai.types.audio.transcription import Transcription
 import torch
 from transformers import (
     AutoModelForSpeechSeq2Seq,
@@ -89,13 +87,6 @@ class Whisper:
         output: WhisperOutput = self.run_pipe(file, translate)
         return text(output)
 
-    def transcribe_batch_vllm(self, files: list[str | Path]) -> list[str | Exception]:
-        client = OpenAI(
-            api_key="EMPTY",
-            base_url="http://localhost:9000/v1",
-        )
-        return [fetch_transcriptions(client, f) for f in files]
-
     def transcribe_batch(
         self, files: list[str | Path], translate=False
     ) -> list[str | Exception]:
@@ -159,18 +150,3 @@ The following is the chunked transcription by the Whisper model:
 ```
 """
     return merged
-
-
-def fetch_transcriptions(client: OpenAI, fpath: str | Path) -> str:
-    with open(str(fpath), "rb") as f:
-        t: Transcription = client.audio.transcriptions.create(
-            file=f,
-            model="openai/whisper-large-v3-turbo",
-            temperature=0.0,
-            # the following fields were present in the request but ignored: {'return_timestamps', 'chunk_length_s'}
-            extra_body={
-                "return_timestamps": True,
-                "chunk_length_s": 30,
-            },
-        )
-    return t.text.strip()
