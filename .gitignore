@@ -1,3 +1,6 @@
+examples/answers.jsonl
+examples/space_woaudio.mp4
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
