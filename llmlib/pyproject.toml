@@ -22,6 +22,7 @@ dependencies = [
     "strenum>=0.4.15",
     "qwen-vl-utils>=0.0.10",
     "tenacity>=8.2.0",
+    "aiohttp>=3.12.15",
 ]
 
 # I cannot add the dependencies below. I suspect that torch is a build-time dependency for flash-attn, or something like that.
