@@ -206,7 +206,6 @@ def _call_gemini(
     logger.info("Calling the Google API. model_name='%s'", req.model_name)
     default_gen_kwargs = {
         "max_output_tokens": default_max_n_tokens,
-        "temperature": 0.0,
         "safety_settings": safety_filters(req.safety_filter_threshold),
     }
     config = default_gen_kwargs | req.gen_kwargs
