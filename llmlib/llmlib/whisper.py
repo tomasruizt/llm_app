@@ -125,7 +125,8 @@ class Whisper:
             kwargs["generate_kwargs"] = {"language": "english"}
         # ignore this warning:
         # .../site-packages/transformers/models/whisper/generation_whisper.py:496: FutureWarning: The input name `inputs` is deprecated. Please make sure to use `input_features` instead.
-        with warnings.catch_warnings(action="ignore", category=FutureWarning):
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=FutureWarning)
             data = self.pipe(
                 file_or_files,
                 **kwargs,
