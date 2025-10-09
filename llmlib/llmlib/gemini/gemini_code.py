@@ -22,6 +22,7 @@ from google.genai.types import (
     CreateCachedContentConfig,
     CachedContent,
     ThinkingConfig,
+    GenerateContentConfig,
 )
 import cv2
 import os
@@ -79,12 +80,13 @@ class MultiTurnRequest:
     model_name: GeminiModels = GeminiModels.default
     gen_kwargs: dict[str, Any] = field(default_factory=dict)
     safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
-    delete_files_after_use: bool = True
+    delete_files_after_use: bool = False
     use_context_caching: bool = False
     location: str = default_location
     json_schema: type[BaseModel] | None = None
-    output_dict: bool = False
-    include_thoughts: bool = False
+    output_dict: bool = True
+    include_thoughts: bool = True
+    response_logprobs: bool = False
 
     def fetch_media_description(self) -> str | dict:
         return _execute_multi_turn_req(self)
@@ -124,6 +126,10 @@ def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
 
     data = {"response": response.text, **config}
     reasonings = [p.text for p in response.candidates[0].content.parts if p.thought]
+    logprobs = getattr(response.candidates[0], "logprobs_result", None)
+    if logprobs is not None:
+        data["logprobs"] = logprobs.model_dump(exclude_unset=True)
+
     if len(reasonings) > 1:
         logger.warning("Found %d reasoning parts. Expected 1.", len(reasonings))
     if len(reasonings) > 0:
@@ -215,6 +221,11 @@ def _call_gemini(
 
     if req.include_thoughts:
         config["thinking_config"] = ThinkingConfig(include_thoughts=True)
+
+    if req.response_logprobs:
+        config["generate_content_config"] = GenerateContentConfig(
+            response_logprobs=True, logprobs=2
+        )
 
     if isinstance(cached_content, CachedContent):
         config["cached_content"] = cached_content.name
@@ -372,11 +383,12 @@ default_max_n_tokens = 1_000
 class GeminiAPI(LLM):
     model_id: str = GeminiModels.default
     use_context_caching: bool = False
-    delete_files_after_use: bool = True
+    delete_files_after_use: bool = False
     safety_filter_threshold: HarmBlockThreshold = HarmBlockThreshold.BLOCK_NONE
     location: str = default_location  # https://cloud.google.com/about/locations#europe
     max_n_batching_threads: int = 16
-    include_thoughts: bool = False
+    include_thoughts: bool = True
+    response_logprobs: bool = False
     max_output_tokens: int = default_max_n_tokens
 
     requires_gpu_exclusively = False
@@ -385,7 +397,7 @@ class GeminiAPI(LLM):
     def complete_msgs(
         self,
         msgs: list[Message],
-        output_dict: bool = False,
+        output_dict: bool = True,
         json_schema: type[BaseModel] | None = None,
         **gen_kwargs,
     ) -> str:
@@ -414,6 +426,7 @@ class GeminiAPI(LLM):
             use_context_caching=self.use_context_caching,
             location=self.location,
             include_thoughts=self.include_thoughts,
+            response_logprobs=self.response_logprobs,
             **kwargs,
         )
         return req
@@ -554,7 +567,11 @@ def to_batch_row(be: LlmReq, threshold: HarmBlockThreshold) -> dict:
         }
         for msg in be.convo
     ]
-    config = be.gen_kwargs | {"thinking_config": {"include_thoughts": True}}
+    config = (
+        be.gen_kwargs
+        | {"thinking_config": {"include_thoughts": True}}
+        | {"generate_content_config": {"response_logprobs": True, "logprobs": 2}}
+    )
     return {
         **be.metadata,
         "request": {
