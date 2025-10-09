@@ -46,6 +46,7 @@ class TranscribedVideo(Input):
         dataset_dir: Path | None = None,
         video_id: str | None = None,
     ) -> dict:
+        assert dataset_dir is not None, "dataset_dir must be provided to mute video"
         transcript = get_transcript(dataset_dir, video_id)
         assert transcript is not None, "Transcript must be provided"
         prompt = fill_prompt(meta_data, read_prompt_template())
@@ -69,8 +70,19 @@ class MutedVideo(Input):
         dataset_dir: Path | None = None,
         video_id: str | None = None,
     ) -> dict:
-        muted_path = mute_video(dataset_dir, video_path)
         assert dataset_dir is not None, "dataset_dir must be provided to mute video"
+        transcript = get_transcript(dataset_dir, video_id)
+        assert transcript is not None, "Transcript must be provided"
+        prompt = fill_prompt(meta_data, read_prompt_template())
+        pretty_json = json.dumps(transcript, indent=2, ensure_ascii=False)
+        prompt += (
+            "\n\nAdditional context:\n"
+            "The following is the chunked transcription by the Whisper model:\n"
+            "```json\n"
+            f"{pretty_json}\n"
+            "```\n"
+        )
+        muted_path = mute_video(dataset_dir, video_path)
         prompt = fill_prompt(meta_data, read_prompt_template())
         return {"messages": [Message(role="user", msg=prompt, video=muted_path)]}
 
@@ -84,8 +96,8 @@ class MutedNoTranscriptVideo(Input):
         dataset_dir: Path | None = None,
         video_id: str | None = None,
     ) -> dict:
-        muted_path = mute_video(dataset_dir, video_path)
         assert dataset_dir is not None, "dataset_dir must be provided to mute video"
+        muted_path = mute_video(dataset_dir, video_path)
         prompt = fill_prompt(meta_data, read_prompt_template())
         return {"messages": [Message(role="user", msg=prompt, video=muted_path)]}
 
