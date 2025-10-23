@@ -30,6 +30,13 @@ import requests
 from tqdm import tqdm
 import google
 from strenum import StrEnum
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    wait_random,
+    retry_if_exception,
+)
 from ..base_llm import LLM, Message, validate_only_first_message_has_files, LlmReq
 from ..error_handling import notify_bugsnag
 from pydantic import BaseModel
@@ -197,6 +204,25 @@ def role_map(role: str) -> str:
     return dict(user="user", assistant="model")[role]
 
 
+def is_429_resource_exhausted_error(exception) -> bool:
+    return "429 RESOURCE_EXHAUSTED" in str(exception)
+
+
+def _log_retry_attempt(retry_state):
+    logger.warning(
+        "Retrying Gemini API call (attempt %d/3) due to HTTP 429 rate limit",
+        retry_state.attempt_number + 1,
+    )
+
+
+@retry(
+    # Total of 3 attempts: 1 initial + 2 retries
+    stop=stop_after_attempt(3),
+    # Exponential backoff with jitter
+    wait=wait_exponential(multiplier=1, min=1, max=4) + wait_random(0, 1),
+    retry=retry_if_exception(is_429_resource_exhausted_error),
+    before_sleep=_log_retry_attempt,
+)
 def _call_gemini(
     client: genai.Client,
     req: MultiTurnRequest,
