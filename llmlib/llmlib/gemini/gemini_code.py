@@ -116,6 +116,8 @@ def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
             cached_content, blobs = cache_content(client, req.model_name, files)
     else:  # Add files to the content
         blobs = upload_files(files=files)
+        # Place first the files, then the text
+        # https://ai.google.dev/gemini-api/docs/video-understanding
         contents = [*blobs_to_parts(blobs), *contents]
         cached_content = None
 
