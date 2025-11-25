@@ -17,6 +17,10 @@ class Message:
     video: Path | BytesIO | None = None
     files: list[Path] | None = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        # Ensure self.files is a list of Paths
+        self.files = [Path(f) for f in self.files]
+
     @classmethod
     def from_prompt(cls, prompt: str) -> Self:
         return cls(role="user", msg=prompt)

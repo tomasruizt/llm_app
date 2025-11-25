@@ -22,6 +22,7 @@ from google.genai.types import (
     CreateCachedContentConfig,
     CachedContent,
     ThinkingConfig,
+    FinishReason,
 )
 import cv2
 import os
@@ -92,6 +93,7 @@ class MultiTurnRequest:
     json_schema: type[BaseModel] | None = None
     output_dict: bool = False
     include_thoughts: bool = False
+    fail_if_max_tokens_reached: bool = True
 
     def fetch_media_description(self) -> str | dict:
         return _execute_multi_turn_req(self)
@@ -131,7 +133,11 @@ def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
     if not req.output_dict:
         return response.text
 
-    data = {"response": response.text, **config}
+    data = {
+        "response": response.text,
+        "finish_reason": get_finish_reason(response),
+        **config,
+    }
     reasonings = [p.text for p in response.candidates[0].content.parts if p.thought]
     if len(reasonings) > 1:
         logger.warning("Found %d reasoning parts. Expected 1.", len(reasonings))
@@ -258,16 +264,20 @@ def _call_gemini(
             "No candidates in response. prompt_feedback='%s'" % response.prompt_feedback
         )
 
-    finish_reason = response.candidates[0].finish_reason
+    finish_reason = get_finish_reason(response)
     logger.info("Finish reason: %s", finish_reason)
 
     enum = type(finish_reason)
     if finish_reason in {enum.SAFETY, enum.PROHIBITED_CONTENT}:
         raise UnsafeResponseError(safety_ratings=response.candidates[0].safety_ratings)
-    if finish_reason == enum.MAX_TOKENS:
+    if finish_reason == enum.MAX_TOKENS and req.fail_if_max_tokens_reached:
         raise ValueError("Max tokens reached. Token usage: %s" % repr(token_usage))
 
     return response, config
+
+
+def get_finish_reason(response: GenerateContentResponse) -> FinishReason:
+    return response.candidates[0].finish_reason
 
 
 def create_client(location: str = default_location):
@@ -406,7 +416,7 @@ class GeminiAPI(LLM):
     max_n_batching_threads: int = 16
     include_thoughts: bool = False
     max_output_tokens: int = default_max_n_tokens
-
+    fail_if_max_tokens_reached: bool = True
     requires_gpu_exclusively = False
     model_ids = available_models
 
@@ -442,6 +452,7 @@ class GeminiAPI(LLM):
             use_context_caching=self.use_context_caching,
             location=self.location,
             include_thoughts=self.include_thoughts,
+            fail_if_max_tokens_reached=self.fail_if_max_tokens_reached,
             **kwargs,
         )
         return req
@@ -484,7 +495,7 @@ class GeminiAPI(LLM):
             data = data | {"success": True, "request_idx": request_idx, **req.metadata}
             return data
         except Exception as e:
-            logger.error("Error processing request %d: %s", request_idx, e)
+            logger.exception("Error processing request %d: %s", request_idx, e)
             return {
                 "success": False,
                 "request_idx": request_idx,
