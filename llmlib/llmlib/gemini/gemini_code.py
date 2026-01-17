@@ -46,7 +46,8 @@ logger = getLogger(__name__)
 
 project_id = "css-lehrbereich-schwemmer"  # (ToxicAInment) from google cloud console
 # On what regions is which model available? https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations#europe
-default_location = "us-central1"  # https://cloud.google.com/about/locations#europe
+default_location = "global"  # https://cloud.google.com/about/locations#europe
+batch_location = "us-central1"  # location='global' doesn't support batch mode
 
 
 class Buckets:
@@ -68,8 +69,11 @@ class GeminiModels(StrEnum):
     https://cloud.google.com/vertex-ai/generative-ai/docs/context-cache/context-cache-overview#supported_models
     """
 
+    default = gemini_30_flash = "gemini-3-flash-preview"
+    gemini_30_pro = "gemini-3-pro-preview"
+
     gemini_25_pro = "gemini-2.5-pro"
-    default = gemini_25_flash = "gemini-2.5-flash"
+    gemini_25_flash = "gemini-2.5-flash"
     gemini_20_flash = "gemini-2.0-flash-001"
     gemini_20_flash_lite = "gemini-2.0-flash-lite-001"
 
@@ -403,7 +407,7 @@ class ResponseRefusedException(Exception):
     pass
 
 
-default_max_n_tokens = 1_000
+default_max_n_tokens = 2_000
 
 
 @dataclass
@@ -469,7 +473,7 @@ class GeminiAPI(LLM):
             entries=entries,
             tgt_dir=tgt_dir,
             safety_filter_threshold=self.safety_filter_threshold,
-            location=self.location,
+            location=batch_location,
         )
         return name
 

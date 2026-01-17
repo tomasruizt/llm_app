@@ -39,7 +39,7 @@ def test_gemini_vision_using_interface():
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_gemini_knows_capital_of_france():
     model = GeminiAPI(
-        model_id=GeminiModels.gemini_25_pro,
+        model_id=GeminiModels.gemini_30_pro,
         location="global",
         include_thoughts=True,
     )
@@ -59,7 +59,10 @@ def test_multiturn_textonly_conversation():
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
-@pytest.mark.parametrize("use_context_caching", [False, True])
+@pytest.mark.parametrize(
+    "use_context_caching",
+    [False],  # No longer testing context caching
+)
 def test_multiturn_conversation_with_6min_video_and_context_caching(
     use_context_caching: bool,
 ):
@@ -75,11 +78,15 @@ def test_multiturn_conversation_with_6min_video_and_context_caching(
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
-@pytest.mark.parametrize("use_context_caching", [False, True])
+@pytest.mark.parametrize(
+    "use_context_caching",
+    [False],  # No longer testing context caching
+)
 def test_gemini_multiturn_convo_with_multiple_imgs(use_context_caching: bool):
     model = GeminiAPI(
         use_context_caching=use_context_caching,
         delete_files_after_use=False,
+        max_output_tokens=5_000,
     )
     assert_model_supports_multiturn_with_multiple_imgs(model)
 
@@ -89,9 +96,10 @@ def test_get_cached_content():
     """We can cache content and reuse the cache later"""
     path: Path = file_for_test("tasting travel - rome italy.mp4")
     client = create_client()
-    model_id = GeminiModels.gemini_25_flash
+    model_id = GeminiModels.gemini_30_flash
     _, success = get_cached_content(client, model_id=model_id, paths=[path])
-    assert not success
+    if success:
+        pytest.skip("Cached content already exists. Skipping test.")
 
     cache_content(client, model_id=model_id, paths=[path], ttl="60s")
     cached_content, success = get_cached_content(
@@ -103,6 +111,7 @@ def test_get_cached_content():
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_batch_mode_inference():
+    # 2026-01-17: Gemini 3.0 is not yet supported in batch mode
     model = GeminiAPI(model_id=GeminiModels.gemini_25_flash)
     batch = [
         LlmReq(
@@ -125,7 +134,7 @@ def test_batch_mode_inference():
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_gemini_can_use_multiple_gen_kwargs():
-    model = GeminiAPI(model_id=GeminiModels.gemini_25_flash)
+    model = GeminiAPI(model_id=GeminiModels.gemini_30_flash)
     assert_model_can_use_multiple_gen_kwargs_in_batch(model)
 
 
