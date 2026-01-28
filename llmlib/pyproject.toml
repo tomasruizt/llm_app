@@ -5,31 +5,37 @@ description = ""
 authors = [{ name = "Tomas Ruiz", email = "tomas.ruiz.te@gmail.com" }]
 readme = "README.md"
 requires-python = ">=3.10"
+
+# Core lightweight dependencies (API-only usage: Gemini, OpenAI, Replicate)
 dependencies = [
     "bugsnag>=4.7.1",
     "decorator>=5.1.1",
     "replicate>=1.0.4",
-    "transformers>=4.47.1",
     "pillow>=11.1.0",
     "google-genai>=1.5.0",
-    "torch>=2.6.0",
     "fastapi>=0.115.11",
     "openai>=1.66.3",
     "deepdiff>=8.3.0",
     "google-cloud-storage>=3.1.0",
-    "opencv-python>=4.11.0.86",
     "pandas>=2.2.3",
     "strenum>=0.4.15",
-    "qwen-vl-utils>=0.0.10",
     "tenacity>=8.2.0",
     "aiohttp>=3.12.15",
-    "scikit-learn>=1.7.2",
 ]
 
-# I cannot add the dependencies below. I suspect that torch is a build-time dependency for flash-attn, or something like that.
-# "accelerate>=0.34.2",
-# "flash-attn>=2.6.3",
-# "torch>=2.4.0",
+[project.optional-dependencies]
+# Heavy dependencies for local model inference (torch, transformers, vllm)
+all = [
+    "torch>=2.6.0",
+    "transformers>=4.47.1",
+    "opencv-python>=4.11.0.86",
+    "qwen-vl-utils>=0.0.10",
+    "scikit-learn>=1.7.2",
+    "vllm>=0.6.0",
+]
+
+# Note: flash-attn requires torch at build time, so it must be installed separately:
+# pip install flash-attn,
 
 [build-system]
 requires = ["hatchling"]

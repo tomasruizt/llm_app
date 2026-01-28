@@ -5,9 +5,7 @@ import json
 import os
 from pathlib import Path
 import PIL
-import cv2
 from llmlib.base_llm import LLM, Message, LlmReq
-import numpy as np
 from pydantic import BaseModel
 import pytest
 
@@ -277,8 +275,16 @@ def assert_model_supports_multiple_imgs(model: LLM):
     return convo, answer
 
 
-def decode_base64_to_array(base64_str: str) -> np.ndarray:
+def decode_base64_to_array(base64_str: str):
     """Decode base64 string to OpenCV image (numpy array)"""
+    try:
+        import cv2
+        import numpy as np
+    except ImportError:
+        raise ImportError(
+            "opencv-python and numpy are required for image decoding. "
+            "Install with: pip install llmlib[all]"
+        )
     # Remove data URL prefix if present
     if "base64," in base64_str:
         base64_str = base64_str.split("base64,")[1]

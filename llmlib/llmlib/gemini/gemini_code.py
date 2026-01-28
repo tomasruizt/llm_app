@@ -24,7 +24,6 @@ from google.genai.types import (
     ThinkingConfig,
     FinishReason,
 )
-import cv2
 import os
 from google import genai
 import requests
@@ -168,6 +167,13 @@ def is_long_enough_to_cache(paths: list[Path]) -> bool:
 
 def video_duration_in_sec(filename: Path) -> float:
     """Inspired by https://stackoverflow.com/a/61572332/5730291, but directly asking for duration did not work."""
+    try:
+        import cv2
+    except ImportError:
+        raise ImportError(
+            "opencv-python is required for video duration calculation. "
+            "Install with: pip install llmlib[all]"
+        )
     video = cv2.VideoCapture(filename)
     frame_count = video.get(cv2.CAP_PROP_FRAME_COUNT)
     fps = video.get(cv2.CAP_PROP_FPS)

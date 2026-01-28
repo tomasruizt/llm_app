@@ -1,8 +1,7 @@
 """
 1. Install dependencies (tested on Python 3.11). From this directory (examples/), run:
   pip install uv
-  uv pip install -e ../llmlib
-  uv pip install vllm
+  uv pip install -e "../llmlib[all]"
 
 2. Then run the script:
   python vllm-video-inference.py
