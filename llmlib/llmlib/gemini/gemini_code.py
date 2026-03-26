@@ -4,6 +4,7 @@ Based on https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/video-
 
 import pandas as pd
 from dataclasses import dataclass, field
+from functools import lru_cache
 from io import BytesIO
 import json
 from logging import getLogger
@@ -248,7 +249,7 @@ def _call_gemini(
     contents: list[Part],
     cached_content: CachedContent | None = None,
 ) -> tuple[GenerateContentResponse, dict]:
-    logger.info("Calling the Google API. model_name='%s'", req.model_name)
+    logger.debug("Calling the Google API. model_name='%s'", req.model_name)
     default_gen_kwargs = {
         "max_output_tokens": default_max_n_tokens,
         "safety_settings": safety_filters(req.safety_filter_threshold),
@@ -268,7 +269,7 @@ def _call_gemini(
         model=req.model_name, contents=contents, config=config
     )
     token_usage = response.usage_metadata.to_json_dict()
-    logger.info("Token usage: %s", token_usage)
+    logger.debug("Token usage: %s", token_usage)
 
     if len(response.candidates) == 0:
         raise ResponseRefusedException(
@@ -276,9 +277,10 @@ def _call_gemini(
         )
 
     finish_reason = get_finish_reason(response)
-    logger.info("Finish reason: %s", finish_reason)
-
     enum = type(finish_reason)
+    if finish_reason != enum.STOP:
+        logger.warning("Finish reason: %s", finish_reason)
+
     if finish_reason in {enum.SAFETY, enum.PROHIBITED_CONTENT}:
         raise UnsafeResponseError(safety_ratings=response.candidates[0].safety_ratings)
     if finish_reason == enum.MAX_TOKENS and req.fail_if_max_tokens_reached:
@@ -291,8 +293,9 @@ def get_finish_reason(response: GenerateContentResponse) -> FinishReason:
     return response.candidates[0].finish_reason
 
 
+@lru_cache  # Thread-safe: genai.Client creates a new requests.Session per call
 def create_client(location: str = default_location):
-    logger.info(
+    logger.debug(
         "Creating client for location='%s', project_id='%s'", location, project_id
     )
     return genai.Client(
@@ -327,6 +330,7 @@ def mime_type(file_name: str) -> str:
         ".png": "image/png",
         ".flac": "audio/flac",
         ".mp3": "audio/mpeg",
+        ".m4a": "audio/mp4",
         ".mp4": "video/mp4",
     }
     for ext, mime in mapping.items():
@@ -380,9 +384,9 @@ def _upload_single_file(
         blob_name = file.name
     blob = bucket.blob(blob_name)
     if blob.exists():
-        logger.info("Blob '%s' already exists. Skipping upload...", blob.name)
+        logger.debug("Blob '%s' already exists. Skipping upload...", blob.name)
         return blob
-    logger.info("Uploading file '%s' to bucket '%s'", file.name, bucket_name)
+    logger.debug("Uploading file '%s' to bucket '%s'", file.name, bucket_name)
     blob.upload_from_filename(str(file))
     return blob
 
@@ -491,7 +495,6 @@ class GeminiAPI(LLM):
             {f for req in batch for msg in req.convo for f in msg.files}
         )
         if unique_files:
-            logger.info("Pre-uploading %d unique files in batch", len(unique_files))
             upload_files(unique_files)
         n_threads = min(len(batch), self.max_n_batching_threads)
         with ThreadPoolExecutor(max_workers=n_threads) as executor:
