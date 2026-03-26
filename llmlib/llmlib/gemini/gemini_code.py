@@ -122,7 +122,8 @@ def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
         if not success:
             cached_content, blobs = cache_content(client, req.model_name, files)
     else:  # Add files to the content
-        blobs = upload_files(files=files)
+        upload_files(files=files)
+        blobs = [get_blob(f) for f in files]
         # Place first the files, then the text
         # https://ai.google.dev/gemini-api/docs/video-understanding
         contents = [*blobs_to_parts(blobs), *contents]
@@ -188,7 +189,8 @@ def cache_content(
 ) -> tuple[CachedContent, list[storage.Blob]]:
     """Caches the content on Google as describe here: https://cloud.google.com/vertex-ai/generative-ai/docs/context-cache/context-cache-create"""
     logger.info("Caching content for paths: %s", paths)
-    blobs = upload_files(files=paths)
+    upload_files(files=paths)
+    blobs = [get_blob(f) for f in paths]
     parts = blobs_to_parts(blobs)
     content = Content(role="user", parts=parts)
     config = CreateCachedContentConfig(
@@ -339,27 +341,31 @@ def mime_type(file_name: str) -> str:
     raise ValueError(f"Unknown mime type for file: {file_name}")
 
 
-def upload_files(files: list[Path]) -> list[storage.Blob]:
+def get_blob(file: Path, bucket_name: str = Buckets.temp) -> storage.Blob:
+    """Return a blob reference for a file in GCS."""
+    return _bucket(name=bucket_name).blob(file.name)
+
+
+def upload_files(files: list[Path]) -> None:
     if len(files) == 0:
-        return []
+        return
     if len(files) <= 3:
-        blobs = [_upload_single_file(file, Buckets.temp) for file in files]
+        for file in files:
+            _upload_single_file(file)
     else:
-        blobs = _upload_batchof_files(files, bucket_name=Buckets.temp)
-    return blobs
+        _upload_batchof_files(files)
 
 
-def _upload_batchof_files(files: list[Path], bucket_name: str) -> list[storage.Blob]:
+def _upload_batchof_files(files: list[Path]) -> None:
     n_processes = min(len(files), int(os.cpu_count() * 0.8))
     logger.info(
         "Uploading %d file(s) in batch to bucket '%s'. Using %d processes",
         len(files),
-        bucket_name,
+        Buckets.temp,
         n_processes,
     )
-    bucket = _bucket(name=bucket_name)
+    blobs = [get_blob(f) for f in files]
     files_str = [str(f) for f in files]
-    blobs = [bucket.blob(file.name) for file in files]
     transfer_manager.upload_many(
         file_blob_pairs=zip(files_str, blobs),
         skip_if_exists=True,
@@ -368,7 +374,6 @@ def _upload_batchof_files(files: list[Path], bucket_name: str) -> list[storage.B
         upload_kwargs={"timeout": 300},
     )
     logger.info("Completed batch upload of %d file(s)", len(files))
-    return blobs
 
 
 def _bucket(name: str) -> storage.Bucket:
@@ -377,18 +382,14 @@ def _bucket(name: str) -> storage.Bucket:
 
 
 def _upload_single_file(
-    file: Path, bucket_name: str, blob_name: str | None = None
-) -> storage.Blob:
-    bucket: storage.Bucket = _bucket(name=bucket_name)
-    if blob_name is None:
-        blob_name = file.name
-    blob = bucket.blob(blob_name)
+    file: Path, bucket_name: str = Buckets.temp, blob_name: str | None = None
+) -> None:
+    blob = _bucket(name=bucket_name).blob(blob_name or file.name)
     if blob.exists():
         logger.debug("Blob '%s' already exists. Skipping upload...", blob.name)
-        return blob
+        return
     logger.debug("Uploading file '%s' to bucket '%s'", file.name, bucket_name)
     blob.upload_from_filename(str(file))
-    return blob
 
 
 def safety_filters(
