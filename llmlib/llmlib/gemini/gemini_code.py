@@ -69,6 +69,7 @@ class GeminiModels(StrEnum):
     """
 
     default = gemini_30_flash = "gemini-3-flash-preview"
+    gemini_31_pro = "gemini-3.1-pro-preview"
     gemini_30_pro = "gemini-3-pro-preview"
 
     gemini_25_pro = "gemini-2.5-pro"
@@ -345,7 +346,7 @@ def upload_files(files: list[Path]) -> list[storage.Blob]:
 
 
 def _upload_batchof_files(files: list[Path], bucket_name: str) -> list[storage.Blob]:
-    n_processes = int(os.cpu_count() * 0.8)
+    n_processes = min(len(files), int(os.cpu_count() * 0.8))
     logger.info(
         "Uploading %d file(s) in batch to bucket '%s'. Using %d processes",
         len(files),
@@ -486,6 +487,12 @@ class GeminiAPI(LLM):
     def complete_batchof_reqs(self, batch: list[LlmReq]) -> Iterable[dict]:
         if len(batch) == 0:
             return []
+        unique_files = list(
+            {f for req in batch for msg in req.convo for f in msg.files}
+        )
+        if unique_files:
+            logger.info("Pre-uploading %d unique files in batch", len(unique_files))
+            upload_files(unique_files)
         n_threads = min(len(batch), self.max_n_batching_threads)
         with ThreadPoolExecutor(max_workers=n_threads) as executor:
             futures = [
