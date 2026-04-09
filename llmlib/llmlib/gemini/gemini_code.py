@@ -99,6 +99,10 @@ class MultiTurnRequest:
     output_dict: bool = False
     include_thoughts: bool = False
     fail_if_max_tokens_reached: bool = True
+    # Set to False when the caller has already uploaded the message files to
+    # GCS (e.g. via the batch upload in `complete_batchof_reqs`) and wants to
+    # skip the redundant per-request `upload_files` call below.
+    do_upload_files: bool = True
 
     def fetch_media_description(self) -> str | dict:
         return _execute_multi_turn_req(self)
@@ -122,7 +126,8 @@ def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
         if not success:
             cached_content, blobs = cache_content(client, req.model_name, files)
     else:  # Add files to the content
-        upload_files(files=files)
+        if req.do_upload_files:
+            upload_files(files=files)
         blobs = [get_blob(f) for f in files]
         # Place first the files, then the text
         # https://ai.google.dev/gemini-api/docs/video-understanding
@@ -510,7 +515,12 @@ class GeminiAPI(LLM):
         request_idx, req = args
         try:
             gen_kwargs = self.gen_kwargs() | req.gen_kwargs
-            mt_kwargs = {"gen_kwargs": gen_kwargs, "output_dict": True}
+            mt_kwargs = {
+                "gen_kwargs": gen_kwargs,
+                "output_dict": True,
+                # Files were already batch-uploaded by `complete_batchof_reqs`.
+                "do_upload_files": False,
+            }
             mt_req = self._multiturn_req(msgs=req.convo, **mt_kwargs)
             data = mt_req.fetch_media_description()
             data = data | {"success": True, "request_idx": request_idx, **req.metadata}
