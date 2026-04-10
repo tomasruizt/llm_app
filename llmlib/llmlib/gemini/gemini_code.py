@@ -437,6 +437,7 @@ class GeminiAPI(LLM):
     max_n_batching_threads: int = 16
     include_thoughts: bool = False
     max_output_tokens: int = default_max_n_tokens
+    temperature: float = 1.0
     fail_if_max_tokens_reached: bool = True
     requires_gpu_exclusively = False
     model_ids = available_models
@@ -535,7 +536,10 @@ class GeminiAPI(LLM):
             }
 
     def gen_kwargs(self) -> dict:
-        return {"max_output_tokens": self.max_output_tokens}
+        return {
+            "max_output_tokens": self.max_output_tokens,
+            "temperature": self.temperature,
+        }
 
 
 def filepaths(msg: Message) -> list[Path]:
