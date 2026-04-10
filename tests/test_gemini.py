@@ -1,6 +1,6 @@
 from pathlib import Path
 import shutil
-from llmlib.base_llm import LlmReq
+from llmlib.base_llm import LlmReq, Message
 from llmlib.gemini.gemini_code import (
     GeminiAPI,
     GeminiModels,
@@ -39,7 +39,7 @@ def test_gemini_vision_using_interface():
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_gemini_knows_capital_of_france():
     model = GeminiAPI(
-        model_id=GeminiModels.gemini_30_pro,
+        model_id=GeminiModels.gemini_31_pro,
         location="global",
         include_thoughts=True,
     )
@@ -136,6 +136,30 @@ def test_batch_mode_inference():
 def test_gemini_can_use_multiple_gen_kwargs():
     model = GeminiAPI(model_id=GeminiModels.gemini_30_flash)
     assert_model_can_use_multiple_gen_kwargs_in_batch(model)
+
+
+@pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
+@pytest.mark.parametrize("output_dict", [True, False])
+def test_gemini_multiple_candidates(output_dict: bool):
+    """Request multiple candidates in a single API call.
+
+    See https://github.com/googleapis/python-genai/issues/1723
+    """
+    n_candidates = 4
+    model = GeminiAPI(
+        model_id=GeminiModels.gemini_31_pro,
+        candidate_count=n_candidates,
+        include_thoughts=True,
+    )
+    result = model.complete_msgs(
+        msgs=[Message(role="user", msg="What is 2+2? Answer with just the number.")],
+        output_dict=output_dict,
+    )
+    if output_dict:
+        assert len(result["response"]) == n_candidates
+        assert len(result["reasoning"]) == n_candidates
+    else:
+        assert len(result) == n_candidates
 
 
 def test_chunk():

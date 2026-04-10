@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from google.cloud import storage
 from google.cloud.storage import transfer_manager
 from google.genai.types import (
+    Candidate,
     Part,
     Content,
     HarmCategory,
@@ -141,20 +142,31 @@ def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
     if req.delete_files_after_use:
         delete_blobs(blobs)
 
-    if not req.output_dict:
-        return response.text
+    candidates = response.candidates
+    is_multiple = len(candidates) > 1
+    texts = [candidate_text(c) for c in candidates]
 
+    if not req.output_dict:
+        return texts if is_multiple else texts[0]
+
+    reasonings = [candidate_reasoning(c) for c in candidates]
     data = {
-        "response": response.text,
+        "response": texts if is_multiple else texts[0],
         "finish_reason": get_finish_reason(response),
         **config,
     }
-    reasonings = [p.text for p in response.candidates[0].content.parts if p.thought]
-    if len(reasonings) > 1:
-        logger.warning("Found %d reasoning parts. Expected 1.", len(reasonings))
-    if len(reasonings) > 0:
-        data["reasoning"] = reasonings[0]
+    if any(r is not None for r in reasonings):
+        data["reasoning"] = reasonings if is_multiple else reasonings[0]
     return data
+
+
+def candidate_text(candidate: Candidate) -> str:
+    return "".join(p.text for p in candidate.content.parts if not p.thought)
+
+
+def candidate_reasoning(candidate: Candidate) -> str | None:
+    parts = [p.text for p in candidate.content.parts if p.thought]
+    return parts[0] if parts else None
 
 
 def is_long_enough_to_cache(paths: list[Path]) -> bool:
@@ -276,6 +288,7 @@ def _call_gemini(
         model=req.model_name, contents=contents, config=config
     )
     token_usage = response.usage_metadata.to_json_dict()
+    config["token_usage"] = token_usage
     logger.debug("Token usage: %s", token_usage)
 
     if len(response.candidates) == 0:
@@ -438,6 +451,7 @@ class GeminiAPI(LLM):
     include_thoughts: bool = False
     max_output_tokens: int = default_max_n_tokens
     temperature: float = 1.0
+    candidate_count: int = 1
     fail_if_max_tokens_reached: bool = True
     requires_gpu_exclusively = False
     model_ids = available_models
@@ -448,7 +462,7 @@ class GeminiAPI(LLM):
         output_dict: bool = False,
         json_schema: type[BaseModel] | None = None,
         **gen_kwargs,
-    ) -> str:
+    ) -> str | list[str] | dict:
         gen_kwargs = self.gen_kwargs() | gen_kwargs
         req = self._multiturn_req(
             msgs=msgs,
@@ -539,6 +553,7 @@ class GeminiAPI(LLM):
         return {
             "max_output_tokens": self.max_output_tokens,
             "temperature": self.temperature,
+            "candidate_count": self.candidate_count,
         }
 
 
