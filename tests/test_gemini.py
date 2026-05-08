@@ -13,6 +13,7 @@ from google.genai.types import CachedContent
 import pytest
 
 from tests.helpers import (
+    assert_model_can_hear_audio,
     assert_model_can_output_json_schema,
     assert_model_can_use_multiple_gen_kwargs_in_batch,
     assert_model_knows_capital_of_france,
@@ -34,6 +35,12 @@ def test_gemini_vision_using_interface():
     assert_model_knows_capital_of_france(model)
     assert_model_recognizes_pyramid_in_image(model)
     assert_model_recognizes_afd_in_video(model)
+
+
+@pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
+def test_gemini_can_hear_audio():
+    model = GeminiAPI(max_output_tokens=5_000)
+    assert_model_can_hear_audio(model)
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")

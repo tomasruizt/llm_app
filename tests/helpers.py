@@ -129,6 +129,21 @@ def assert_model_recognizes_afd_in_video(model: LLM, **kwargs):
     assert "alternative für deutschland" in answer or "afd" in answer, answer
 
 
+def assert_model_can_hear_audio(model: LLM, **kwargs):
+    """The librispeech clip has no visual track, so the model can only
+    answer correctly if it actually consumed the audio. The transcript
+    explicitly mentions a pig and a gamecock; both must be named."""
+    audio_path = file_for_test("some-audio.flac")
+    msg = Message(
+        role="user",
+        msg="What animals are mentioned in this audio? Answer in one short sentence.",
+        files=[audio_path],
+    )
+    answer: str = model.complete_msgs(msgs=[msg], **kwargs).lower()
+    needed = ["pig", "gamecock"]
+    assert all(a in answer for a in needed), answer
+
+
 def get_mona_lisa_completion(model: LLM) -> str:
     msg: Message = mona_lisa_message()
     answer: str = model.complete_msgs(msgs=[msg])
