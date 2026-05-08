@@ -72,16 +72,6 @@ class GeminiModels(StrEnum):
 
     default = gemini_30_flash = "gemini-3-flash-preview"
     gemini_31_pro = "gemini-3.1-pro-preview"
-    gemini_30_pro = "gemini-3-pro-preview"
-
-    gemini_25_pro = "gemini-2.5-pro"
-    gemini_25_flash = "gemini-2.5-flash"
-    gemini_20_flash = "gemini-2.0-flash-001"
-    gemini_20_flash_lite = "gemini-2.0-flash-lite-001"
-
-    # 2025-05-18: Gemini 1.5 is being deprecated
-    # gemini_15_pro = "gemini-1.5-pro"
-    # gemini_15_flash = "gemini-1.5-flash-002"
 
 
 available_models = list(GeminiModels)
