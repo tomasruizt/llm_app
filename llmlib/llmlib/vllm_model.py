@@ -4,7 +4,7 @@ from typing import Any, Iterable
 import pandas as pd
 from dataclasses import dataclass, field
 from llmlib.base_llm import LLM as BaseLLM, Conversation, LlmReq
-from llmlib.huggingface_inference import is_img, is_video
+from llmlib.huggingface_inference import is_audio, is_img, is_video
 import logging
 from .openai.openai_completion import (
     to_synchronous_generator,
@@ -138,6 +138,19 @@ def to_vllm_oai_format(convo: Conversation) -> list[dict]:
                             "type": "video_url",
                             "video_url": {"url": f"file://{file_path}"},
                         }
+                    )
+                elif is_audio(file):
+                    content.append(
+                        {
+                            "type": "audio_url",
+                            "audio_url": {"url": f"file://{file_path}"},
+                        }
+                    )
+                else:
+                    raise NotImplementedError(
+                        f"Unsupported file type for vLLM chat: {file_path}. "
+                        "Supported: image (.png/.jpg/.jpeg), video (.mp4), "
+                        "audio (.mp3/.m4a/.flac/.wav/.ogg)."
                     )
 
         # For system messages, content is just the text

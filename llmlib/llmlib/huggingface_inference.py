@@ -121,6 +121,11 @@ def is_video(file_path: str | Path) -> bool:
     return str(file_path).lower().endswith(permitted)
 
 
+def is_audio(file_path: str | Path) -> bool:
+    permitted = (".mp3", ".m4a", ".flac", ".wav", ".ogg")
+    return str(file_path).lower().endswith(permitted)
+
+
 def extract_content_piece(img: PIL.Image.Image | str | Path) -> dict:
     image_bytes = extract_bytes(img)
     content_piece = {

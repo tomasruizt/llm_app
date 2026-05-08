@@ -126,6 +126,31 @@ def test_vllm_model_format_case2():
     assert to_vllm_oai_format(convo) == expected_oai_format
 
 
+def test_vllm_model_format_audio():
+    audio_path: Path = file_for_test("some-audio.flac")
+    convo = [Message(role="user", msg="What do you hear?", files=[audio_path])]
+    oai = to_vllm_oai_format(convo)
+    assert oai == [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "What do you hear?"},
+                {
+                    "type": "audio_url",
+                    "audio_url": {"url": f"file://{str(audio_path.absolute())}"},
+                },
+            ],
+        },
+    ]
+
+
+def test_vllm_model_format_rejects_unsupported_file_type():
+    txt_path: Path = file_for_test("toxicity-prompt.txt")
+    convo = [Message(role="user", msg="What is this?", files=[txt_path])]
+    with pytest.raises(NotImplementedError, match="Unsupported file type"):
+        to_vllm_oai_format(convo)
+
+
 def test_dump_convo_as_batch_request():
     convo1, _ = _vllm_oai_example_img()
     convo2, _ = _vllm_oai_example_video()
