@@ -6,8 +6,10 @@ from llmlib.semantic_similarity import SemanticSimilarity
 import pytest
 from llmlib.openai.openai_completion import (
     OpenAIModel,
+    as_dict,
     config_for_openrouter,
     extract_msgs,
+    to_openai_gen_kwargs,
 )
 from deepdiff import DeepDiff
 
@@ -49,6 +51,28 @@ def test_extract_msgs():
         },
     ]
     assert DeepDiff(messages, expected_msgs) == {}
+
+
+def test_candidate_count_is_translated_to_openai_n():
+    kwargs = to_openai_gen_kwargs({"temperature": 1.0, "candidate_count": 3})
+    assert kwargs == {"temperature": 1.0, "n": 3}
+
+
+def test_as_dict_preserves_multiple_choices():
+    completion = {
+        "choices": [
+            {"message": {"content": "first", "reasoning_content": "thinking 1"}},
+            {"message": {"content": "second", "reasoning_content": "thinking 2"}},
+        ],
+        "usage": {"prompt_tokens": 11, "completion_tokens": 22},
+    }
+
+    result = as_dict(completion)
+
+    assert result["response"] == ["first", "second"]
+    assert result["reasoning"] == ["thinking 1", "thinking 2"]
+    assert result["n_input_tokens"] == 11
+    assert result["n_output_tokens"] == 22
 
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")

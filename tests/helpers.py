@@ -352,6 +352,23 @@ def assert_model_can_use_multiple_gen_kwargs_in_batch(model: LLM):
     assert r2["temperature"] == 0.8, r2["temperature"]
 
 
+def assert_model_supports_multiple_candidates(
+    model: LLM, output_dict: bool, n_candidates: int = 4
+):
+    result = model.complete_msgs(
+        msgs=[Message(role="user", msg="What is 2+2? Answer with just the number.")],
+        output_dict=output_dict,
+        temperature=1.0,
+        candidate_count=n_candidates,
+    )
+    if output_dict:
+        assert len(result["response"]) == n_candidates
+        if "reasoning" in result:
+            assert len(result["reasoning"]) == n_candidates
+    else:
+        assert len(result) == n_candidates
+
+
 def assert_model_returns_failure_when_hitting_token_limit(model: LLM):
     req = LlmReq(
         convo=[Message.from_prompt(prompt="Whats the capital of France?")],

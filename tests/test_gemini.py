@@ -1,6 +1,6 @@
 from pathlib import Path
 import shutil
-from llmlib.base_llm import LlmReq, Message
+from llmlib.base_llm import LlmReq
 from llmlib.gemini.gemini_code import (
     GeminiAPI,
     GeminiModels,
@@ -19,6 +19,7 @@ from tests.helpers import (
     assert_model_knows_capital_of_france,
     assert_model_recognizes_afd_in_video,
     assert_model_recognizes_pyramid_in_image,
+    assert_model_supports_multiple_candidates,
     assert_model_supports_multiturn,
     assert_model_supports_multiturn_with_6min_video,
     assert_model_supports_multiturn_with_multiple_imgs,
@@ -152,21 +153,11 @@ def test_gemini_multiple_candidates(output_dict: bool):
 
     See https://github.com/googleapis/python-genai/issues/1723
     """
-    n_candidates = 4
     model = GeminiAPI(
         model_id=GeminiModels.gemini_31_pro,
-        candidate_count=n_candidates,
         include_thoughts=True,
     )
-    result = model.complete_msgs(
-        msgs=[Message(role="user", msg="What is 2+2? Answer with just the number.")],
-        output_dict=output_dict,
-    )
-    if output_dict:
-        assert len(result["response"]) == n_candidates
-        assert len(result["reasoning"]) == n_candidates
-    else:
-        assert len(result) == n_candidates
+    assert_model_supports_multiple_candidates(model, output_dict=output_dict)
 
 
 def test_chunk():

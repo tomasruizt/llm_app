@@ -21,6 +21,13 @@ class ModelvLLM(BaseLLM):
     model_id: str  # e.g "google/gemma-3-4b-it"
     max_new_tokens: int = 500
     temperature: float = 0
+    # Nucleus / top-k / presence penalty. Left as None they are not sent in
+    # the request, so vLLM falls back to the model's generation_config.json
+    # defaults. Set them to pin the model card's recommended sampling params.
+    top_p: float | None = None
+    top_k: int | None = None
+    presence_penalty: float | None = None
+    candidate_count: int = 1
     remote_call_concurrency: int = 8
     port: int = 8000
     more_ports: list[int] = field(default_factory=list)
@@ -51,12 +58,30 @@ class ModelvLLM(BaseLLM):
         ]
         return self.complete_batchof_reqs(new_batch)
 
-    def complete_batchof_reqs(self, batch: Iterable[LlmReq]) -> Iterable[dict]:
-        fixed_gen_kwargs = dict(
+    def fixed_gen_kwargs(self) -> dict:
+        """Per-request generation kwargs derived from this model's config.
+
+        top_p / top_k / presence_penalty are only included when set, so an
+        unset one keeps the model's generation_config.json default. vLLM's
+        OpenAI endpoint accepts top_k / presence_penalty directly.
+        """
+        kwargs = dict(
             model=self.model_id,
             temperature=self.temperature,
             max_tokens=self.max_new_tokens,
+            candidate_count=self.candidate_count,
         )
+        for key, val in (
+            ("top_p", self.top_p),
+            ("top_k", self.top_k),
+            ("presence_penalty", self.presence_penalty),
+        ):
+            if val is not None:
+                kwargs[key] = val
+        return kwargs
+
+    def complete_batchof_reqs(self, batch: Iterable[LlmReq]) -> Iterable[dict]:
+        fixed_gen_kwargs = self.fixed_gen_kwargs()
         new_batch = [
             req.replace(
                 gen_kwargs=fixed_gen_kwargs | req.gen_kwargs,

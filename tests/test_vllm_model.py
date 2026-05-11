@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import os
 from llmlib.base_llm import Conversation, Message
 from llmlib.vllm_model import (
     ModelvLLM,
@@ -22,6 +23,7 @@ from .helpers import (
     assert_model_can_use_multiple_gen_kwargs_in_batch,
     assert_model_can_answer_batch_of_text_prompts,
     # assert_model_supports_multiturn_with_6min_video,
+    assert_model_supports_multiple_candidates,
     assert_model_supports_multiturn,
     assert_model_returns_failure_when_hitting_token_limit,
 )
@@ -34,7 +36,8 @@ cls = ModelvLLM
 @pytest.fixture(scope="session")
 def vllm_server():
     cmd = vllm_test_command(model_id)
-    with spinup_vllm_server(no_op=True, vllm_command=cmd) as server:
+    do_start_vllm = os.environ.get("PYTEST_START_VLLM", "false") == "true"
+    with spinup_vllm_server(no_op=not do_start_vllm, vllm_command=cmd) as server:
         yield server
 
 
@@ -54,13 +57,10 @@ def vllm_test_command(model_id: str) -> list[str]:
         "vllm",
         "serve",
         model_id,
-        "--task=generate",
         "--max-model-len=32768",
-        "--max-seq-len-to-capture=32768",
         "--dtype=bfloat16",
         "--allowed-local-media-path=/home/",
-        "--limit-mm-per-prompt=image=50,video=2",
-        "--disable-log-requests",
+        '--limit-mm-per-prompt={"image":50,"video":2}',
         "--port=8000",
         "--gpu-memory-utilization=0.8",
         "--enforce-eager",
@@ -70,6 +70,12 @@ def vllm_test_command(model_id: str) -> list[str]:
 def test_vllm_model_local_warnings():
     warnings = cls.get_warnings()
     assert len(warnings) == 0
+
+
+@pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
+@pytest.mark.parametrize("output_dict", [True, False])
+def test_vllm_model_supports_multiple_candidates(vllm_model, output_dict: bool):
+    assert_model_supports_multiple_candidates(vllm_model, output_dict=output_dict)
 
 
 # Gemma3 default params: https://huggingface.co/unsloth/gemma-3-27b-it-GGUF/blob/main/params

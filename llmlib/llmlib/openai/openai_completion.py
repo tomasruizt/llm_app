@@ -119,17 +119,27 @@ def to_synchronous_generator(
 
 
 def as_dict(completion: dict) -> dict:
-    message = completion["choices"][0]["message"]
+    choices = completion["choices"]
+    messages = [choice["message"] for choice in choices]
+    is_multiple = len(messages) > 1
+    responses = [message["content"] for message in messages]
     data = {
-        "response": message["content"],
+        "response": responses if is_multiple else responses[0],
         "n_input_tokens": completion["usage"]["prompt_tokens"],
         "n_output_tokens": completion["usage"]["completion_tokens"],
     }
-    if "reasoning" in message:  # OpenAI format
-        data["reasoning"] = message["reasoning"]
-    elif "reasoning_content" in message:  # vLLM format
-        data["reasoning"] = message["reasoning_content"]
+    reasonings = [extract_reasoning(message) for message in messages]
+    if any(reasoning is not None for reasoning in reasonings):
+        data["reasoning"] = reasonings if is_multiple else reasonings[0]
     return data
+
+
+def extract_reasoning(message: dict) -> str | None:
+    if "reasoning" in message:  # OpenAI format
+        return message["reasoning"]
+    if "reasoning_content" in message:  # vLLM format
+        return message["reasoning_content"]
+    return None
 
 
 def extract_msgs(msgs: list[Message]) -> list[dict]:
@@ -176,10 +186,11 @@ async def _batch_call_openai(
     async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
         for request_idx, req in enumerate(batch):
             json_schema = req.gen_kwargs.pop("json_schema", None)
+            gen_kwargs = to_openai_gen_kwargs(req.gen_kwargs)
             post_kwargs = {
                 "url": f"{next(urls_iter)}/chat/completions",
                 "headers": headers,
-                "json": {**req.gen_kwargs, "messages": req.messages},
+                "json": {**gen_kwargs, "messages": req.messages},
             }
             if json_schema is not None:
                 post_kwargs["json"]["response_format"] = {
@@ -199,6 +210,14 @@ async def _batch_call_openai(
 
         for task in asyncio.as_completed(tasks):
             yield await task
+
+
+def to_openai_gen_kwargs(gen_kwargs: dict) -> dict:
+    gen_kwargs = dict(gen_kwargs)
+    candidate_count = gen_kwargs.pop("candidate_count", None)
+    if candidate_count is not None:
+        gen_kwargs["n"] = candidate_count
+    return gen_kwargs
 
 
 def _log_retry_attempt(retry_state: RetryCallState):
