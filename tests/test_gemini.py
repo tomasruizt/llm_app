@@ -119,8 +119,7 @@ def test_get_cached_content():
 
 @pytest.mark.skipif(condition=is_ci(), reason="Avoid costs")
 def test_batch_mode_inference():
-    # 2026-01-17: Gemini 3.0 is not yet supported in batch mode
-    model = GeminiAPI(model_id=GeminiModels.gemini_25_flash)
+    model = GeminiAPI(model_id=GeminiModels.gemini_25_flash, location="global")
     batch = [
         LlmReq(
             convo=[two_imgs_message()],

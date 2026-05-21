@@ -72,6 +72,7 @@ class GeminiModels(StrEnum):
 
     default = gemini_30_flash = "gemini-3-flash-preview"
     gemini_31_pro = "gemini-3.1-pro-preview"
+    gemini_25_flash = "gemini-2.5-flash"
 
 
 available_models = list(GeminiModels)
@@ -117,9 +118,10 @@ def _execute_multi_turn_req(req: MultiTurnRequest) -> str:
         if not success:
             cached_content, blobs = cache_content(client, req.model_name, files)
     else:  # Add files to the content
+        sclient = storage_client()
         if req.do_upload_files:
-            upload_files(files=files)
-        blobs = [get_blob(f) for f in files]
+            upload_files(sclient, files)
+        blobs = [get_blob(sclient, f) for f in files]
         # Place first the files, then the text
         # https://ai.google.dev/gemini-api/docs/video-understanding
         contents = [*blobs_to_parts(blobs), *contents]
@@ -196,8 +198,9 @@ def cache_content(
 ) -> tuple[CachedContent, list[storage.Blob]]:
     """Caches the content on Google as describe here: https://cloud.google.com/vertex-ai/generative-ai/docs/context-cache/context-cache-create"""
     logger.info("Caching content for paths: %s", paths)
-    upload_files(files=paths)
-    blobs = [get_blob(f) for f in paths]
+    sclient = storage_client()
+    upload_files(sclient, paths)
+    blobs = [get_blob(sclient, f) for f in paths]
     parts = blobs_to_parts(blobs)
     content = Content(role="user", parts=parts)
     config = CreateCachedContentConfig(
@@ -349,22 +352,28 @@ def mime_type(file_name: str) -> str:
     raise ValueError(f"Unknown mime type for file: {file_name}")
 
 
-def get_blob(file: Path, bucket_name: str = Buckets.temp) -> storage.Blob:
+def storage_client() -> storage.Client:
+    return storage.Client(project=project_id)
+
+
+def get_blob(
+    client: storage.Client, file: Path, bucket_name: str = Buckets.temp
+) -> storage.Blob:
     """Return a blob reference for a file in GCS."""
-    return _bucket(name=bucket_name).blob(file.name)
+    return client.bucket(bucket_name).blob(file.name)
 
 
-def upload_files(files: list[Path]) -> None:
+def upload_files(client: storage.Client, files: list[Path]) -> None:
     if len(files) == 0:
         return
     if len(files) <= 3:
         for file in files:
-            _upload_single_file(file)
+            _upload_single_file(client, file)
     else:
-        _upload_batchof_files(files)
+        _upload_batchof_files(client, files)
 
 
-def _upload_batchof_files(files: list[Path]) -> None:
+def _upload_batchof_files(client: storage.Client, files: list[Path]) -> None:
     n_processes = min(len(files), int(os.cpu_count() * 0.8))
     logger.info(
         "Uploading %d file(s) in batch to bucket '%s'. Using %d processes",
@@ -372,7 +381,7 @@ def _upload_batchof_files(files: list[Path]) -> None:
         Buckets.temp,
         n_processes,
     )
-    blobs = [get_blob(f) for f in files]
+    blobs = [get_blob(client, f) for f in files]
     files_str = [str(f) for f in files]
     transfer_manager.upload_many(
         file_blob_pairs=zip(files_str, blobs),
@@ -384,15 +393,13 @@ def _upload_batchof_files(files: list[Path]) -> None:
     logger.info("Completed batch upload of %d file(s)", len(files))
 
 
-def _bucket(name: str) -> storage.Bucket:
-    client = storage.Client(project=project_id)
-    return client.bucket(name)
-
-
 def _upload_single_file(
-    file: Path, bucket_name: str = Buckets.temp, blob_name: str | None = None
+    client: storage.Client,
+    file: Path,
+    bucket_name: str = Buckets.temp,
+    blob_name: str | None = None,
 ) -> None:
-    blob = _bucket(name=bucket_name).blob(blob_name or file.name)
+    blob = client.bucket(bucket_name).blob(blob_name or file.name)
     if blob.exists():
         logger.debug("Blob '%s' already exists. Skipping upload...", blob.name)
         return
@@ -506,7 +513,7 @@ class GeminiAPI(LLM):
             {f for req in batch for msg in req.convo for f in msg.files}
         )
         if unique_files:
-            upload_files(unique_files)
+            upload_files(storage_client(), unique_files)
         n_threads = min(len(batch), self.max_n_batching_threads)
         with ThreadPoolExecutor(max_workers=n_threads) as executor:
             futures = [
@@ -588,14 +595,18 @@ def submit_batch_job(
     # Upload Input jsonl file
     batch_name = f"batch/{tgt_dir.name}"
     input_blob_name = f"{batch_name}/input.jsonl"
+    sclient = storage_client()
     _upload_single_file(
-        file=input_jsonl, bucket_name=Buckets.output, blob_name=input_blob_name
+        client=sclient,
+        file=input_jsonl,
+        bucket_name=Buckets.output,
+        blob_name=input_blob_name,
     )
 
     # Upload media files
     all_files = [file for e in entries for m in e.convo for file in m.files]
     for files in tqdm(chunk(all_files, 2500)):
-        upload_files(files)
+        upload_files(sclient, files)
 
     # Submit batch job
     output_dir = f"{batch_name}/output"
